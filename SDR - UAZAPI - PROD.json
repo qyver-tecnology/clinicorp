@@ -438,6 +438,12 @@
           ]
         }
       },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -784,
+        -1200
+      ],
       "id": "5f7a27d6-03ae-49f0-8a81-c90c16e9334d",
       "name": "Preparar Contexto"
     },
