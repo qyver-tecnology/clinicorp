@@ -686,6 +686,16 @@ class AgendaAPI:
             # Flag para indicar se é um novo paciente
             is_new_patient = not paciente_id and nome_paciente and telefone
             
+            # Se não tem paciente_id mas tem telefone, tenta buscar paciente existente
+            if is_new_patient and telefone:
+                logger.info(f"🔍 Buscando paciente existente pelo telefone: {telefone}")
+                paciente_existente = self.buscar_paciente_por_telefone(telefone)
+                
+                if paciente_existente and paciente_existente.get('id'):
+                    paciente_id = str(paciente_existente['id'])
+                    is_new_patient = False
+                    logger.info(f"✅ Paciente encontrado no Clinicorp: '{paciente_existente.get('nome')}' (ID: {paciente_id})")
+            
             # Prepara payload para API
             agendamento_data = {
                 "Slots": [{
@@ -719,10 +729,58 @@ class AgendaAPI:
                 "CreatedBy": "WEB",
                 "_AccessPath": "*.Calendar.Appointment.Create"
             }
-        
-        if is_new_patient:
-            # Novo paciente - API do Clinicorp cria automaticamente
-            if not nome_paciente:
+            
+            # Log detalhado do payload para depuração
+            logger.debug(f"Payload do agendamento: {agendamento_data}")
+            
+            if is_new_patient:
+                # Novo paciente - API do Clinicorp cria automaticamente
+                if not nome_paciente:
+                    return {
+                        'sucesso': False,
+                        'erro': 'Nome do paciente é obrigatório para criar novo paciente'
+                    }
+                
+                agendamento_data["isNew"] = "X"
+                agendamento_data["Name"] = nome_paciente
+                logger.info(f"👤 Criando agendamento com NOVO PACIENTE '{nome_paciente}' (telefone: {telefone}) com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
+            else:
+                # Paciente existente
+                agendamento_data["Patient_PersonId"] = int(paciente_id)
+                logger.info(f"📅 Criando agendamento para paciente existente ID:{paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
+            
+            # Faz requisição para criar agendamento
+            response = self.client.post(endpoint, json=agendamento_data, use_api_url=True)
+            
+            if response.status_code == 200:
+                try:
+                    resultado = response.json()
+                    
+                    # Extrai informações da resposta
+                    patient_id_criado = resultado.get('PatientId') or resultado.get('patient_id')
+                    patient_name = resultado.get('PatientName') or resultado.get('patient_name') or nome_paciente
+                    
+                    if is_new_patient and patient_id_criado:
+                        logger.info(f"✅ Agendamento criado com sucesso! Novo paciente criado: '{patient_name}' (ID: {patient_id_criado})")
+                    else:
+                        logger.info(f"✅ Agendamento criado com sucesso")
+                    
+                    return {
+                        'sucesso': True,
+                        'agendamento_id': resultado.get('id') or resultado.get('AppointmentId'),
+                        'paciente_id': patient_id_criado or paciente_id,
+                        'paciente_nome': patient_name,
+                        'resultado': resultado
+                    }
+                except Exception as json_error:
+                    logger.info(f"✅ Agendamento criado com sucesso (resposta não JSON)")
+                    logger.debug(f"Erro ao processar JSON da resposta: {json_error}")
+                    return {
+                        'sucesso': True,
+                        'resultado': response.text
+                    }
+            else:
+                logger.error(f"❌ Erro ao criar agendamento: Status {response.status_code} - {response.text}")
                 return {
                     'sucesso': False,
                     'erro': f"Status {response.status_code}: {response.text}"
