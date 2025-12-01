@@ -469,7 +469,7 @@
     },
     {
       "parameters": {
-        "toolDescription": "Busca profissionais disponíveis com suas agendas. Use IMEDIATAMENTE quando cliente pedir agendamento ou verificar disponibilidade.\n\nRetorna lista de profissionais com horários disponíveis para os próximos 7 dias.\n\n**PALAVRAS-CHAVE:** agendar, agendamento, consulta, horário, disponível, marcar, marcação, amanhã, hoje, quero, preciso\n\n**COMO USAR:** Chame SEM PARÂMETROS quando detectar pedido de agendamento.",
+        "toolDescription": "Busca profissionais disponíveis com suas agendas. Use IMEDIATAMENTE quando cliente pedir agendamento ou verificar disponibilidade.\n\nRetorna lista de profissionais com:\n- id: ID NUMÉRICO LONGO do profissional (ex: 6213405038936064) - GUARDE ESTE ID para usar em Criar_agendamento_local\n- nome: Nome do profissional\n- agendas_por_dia: Horários disponíveis por dia\n\n**IMPORTANTE:** O campo 'id' retornado DEVE ser usado como profissional_id ao criar agendamento.\n\n**COMO USAR:** Chame SEM PARÂMETROS quando detectar pedido de agendamento.",
         "url": "http://72.60.137.139:5000/api/agenda/profissionais",
         "sendQuery": true,
         "parametersQuery": {
@@ -564,7 +564,7 @@
     },
     {
       "parameters": {
-        "toolDescription": "Cria um novo agendamento via API local.\n\nIMPORTANTE: O nome do paciente DEVE ter sido salvo antes usando Salvar_nome_paciente.\n\nParâmetros OBRIGATÓRIOS:\n- profissional_id: ID do profissional escolhido\n- data: Data no formato YYYY-MM-DD\n- hora_inicio: Hora de início no formato HH:MM (ex: 10:00)\n- hora_fim: Hora de fim no formato HH:MM (ex: 11:00)\n\nO telefone é incluído automaticamente. O sistema busca o nome do paciente pelo telefone e cria o paciente no Clinicorp se necessário.",
+        "toolDescription": "Cria um novo agendamento via API local.\n\nIMPORTANTE: \n1. O nome do paciente DEVE ter sido salvo antes usando Salvar_nome_paciente\n2. Use SEMPRE o profissional_id retornado por Buscar_profissionais_disponiveis (ex: 6213405038936064)\n3. NUNCA invente IDs - use EXATAMENTE o ID retornado pela busca\n\nParâmetros OBRIGATÓRIOS:\n- profissional_id: ID NUMÉRICO LONGO do profissional (ex: 6213405038936064) - COPIE da resposta de Buscar_profissionais_disponiveis\n- data: Data no formato YYYY-MM-DD\n- hora_inicio: Hora de início no formato HH:MM (ex: 10:00)\n- hora_fim: Hora de fim no formato HH:MM (ex: 11:00)\n\nO telefone é incluído automaticamente. O sistema busca o nome do paciente pelo telefone e cria o paciente no Clinicorp se necessário.",
         "method": "POST",
         "url": "http://72.60.137.139:5000/api/agenda/criar",
         "sendHeaders": true,
