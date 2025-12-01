@@ -683,36 +683,42 @@ class AgendaAPI:
             # Calcula AtomicDate (YYYYMMDD)
             atomic_date = int(data.strftime('%Y%m%d'))
             
-                "fromTime": hora_inicio,
-                "toTime": hora_fim,
+            # Flag para indicar se é um novo paciente
+            is_new_patient = not paciente_id and nome_paciente and telefone
+            
+            # Prepara payload para API
+            agendamento_data = {
+                "Slots": [{
+                    "fromTime": hora_inicio,
+                    "toTime": hora_fim,
+                    "ScheduleToId": int(profissional_id),
+                    "Name": "",
+                    "Color": "",
+                    "Dentist_PersonId": int(profissional_id)
+                }],
+                "ScheduleToType": "PROFESSIONAL",
                 "ScheduleToId": int(profissional_id),
-                "Name": "",
-                "Color": "",
-                "Dentist_PersonId": int(profissional_id)
-            }],
-            "ScheduleToType": "PROFESSIONAL",
-            "ScheduleToId": int(profissional_id),
-            "AtomicDate": atomic_date,
-            "Clinic_BusinessId": int(clinic_id),
-            "AddInfo": {"AddInfo1": "Confirmation,"},
-            "AlertInfo": {
-                "ConfirmSchedule": "1D",
-                "AlertSchedule": "0H",
-                "ConfirmWhats": "",
-                "ConfirmSms": "X",
-                "AlertWhats": "",
-                "AlertSms": "",
-                "AlertCliniMe": "",
-                "ConfirmCliniMe": ""
-            },
-            "Email": email,
-            "MobilePhone": telefone,
-            "CreateUserId": self._obter_user_id(),
-            "ToTestDate": data_iso,
-            "ProceduresDuration": 0,
-            "CreatedBy": "WEB",
-            "_AccessPath": "*.Calendar.Appointment.Create"
-        }
+                "AtomicDate": atomic_date,
+                "Clinic_BusinessId": int(clinic_id),
+                "AddInfo": {"AddInfo1": "Confirmation,"},
+                "AlertInfo": {
+                    "ConfirmSchedule": "1D",
+                    "AlertSchedule": "0H",
+                    "ConfirmWhats": "",
+                    "ConfirmSms": "X",
+                    "AlertWhats": "",
+                    "AlertSms": "",
+                    "AlertCliniMe": "",
+                    "ConfirmCliniMe": ""
+                },
+                "Email": email,
+                "MobilePhone": telefone,
+                "CreateUserId": self._obter_user_id(),
+                "ToTestDate": data_iso,
+                "ProceduresDuration": 0,
+                "CreatedBy": "WEB",
+                "_AccessPath": "*.Calendar.Appointment.Create"
+            }
         
         if is_new_patient:
             # Novo paciente - API do Clinicorp cria automaticamente
