@@ -1,0 +1,960 @@
+{
+  "name": "SDR - UAZAPI - API Local Completo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "maite",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -3168,
+        -1120
+      ],
+      "id": "f10347fa-63bd-44d5-a890-64c5d1022f16",
+      "name": "Webhook",
+      "webhookId": "240b36f9-9d6d-4946-864b-8b681f3ec906"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id_msg",
+              "name": "id_mensagem",
+              "value": "={{ $json.messageid || $json.id || $json.body?.message?.id || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "tel",
+              "name": "telefone",
+              "value": "={{ ($json.sender_pn || $json.body?.chat?.phone || '').toString().replace('@s.whatsapp.net', '').replace('@c.us', '') }}",
+              "type": "string"
+            },
+            {
+              "id": "msg",
+              "name": "mensagem",
+              "value": "={{ $json.text || $json.body?.message?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "ts",
+              "name": "timestamp",
+              "value": "={{ $json.messageTimestamp || $json.body?.message?.messageTimestamp || Date.now() }}",
+              "type": "number"
+            },
+            {
+              "id": "from_me",
+              "name": "fromMe",
+              "value": "={{ $json.wasSentByApi === true || $json.body?.message?.fromMe === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "is_group",
+              "name": "mensagem_de_grupo",
+              "value": "={{ $json.isGroup === true || $json.body?.chat?.wa_isGroup === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "is_audio",
+              "name": "mensagem_de_audio",
+              "value": "={{ $json.mediaType === 'audio' || $json.type === 'ptt' || $json.body?.message?.mediaType === 'audio' }}",
+              "type": "boolean"
+            },
+            {
+              "id": "subscriber",
+              "name": "subscriber_id",
+              "value": "clinicorp",
+              "type": "string"
+            },
+            {
+              "id": "code",
+              "name": "code_link",
+              "value": "teste",
+              "type": "string"
+            },
+            {
+              "id": "business",
+              "name": "business_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "conversa",
+              "name": "id_conversa",
+              "value": "={{ $json.id || $json.body?.chat?.wa_fastid || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "chatid",
+              "name": "wa_chatid",
+              "value": "={{ $json.sender_pn || $json.chatid || $json.body?.chat?.wa_chatid || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "telegram",
+              "name": "telegram_chat_id",
+              "value": "-1002525748016",
+              "type": "string"
+            },
+            {
+              "id": "baseurl",
+              "name": "BaseUrl",
+              "value": "={{ $json.BaseUrl || $json.body?.BaseUrl || 'https://somoswin.uazapi.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "token",
+              "name": "token",
+              "value": "={{ $json.token || $json.body?.token || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "instance",
+              "name": "instancia",
+              "value": "={{ $json.owner || $json.body?.instanceName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "api_local",
+              "name": "api_local_url",
+              "value": "https://7811d9b534ad.ngrok-free.app",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2768,
+        -1120
+      ],
+      "id": "1f50b2d6-ef57-4e0f-abc0-69db29b6a79d",
+      "name": "Extrair Dados"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not_from_me",
+              "leftValue": "={{ $json.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            },
+            {
+              "id": "not_group",
+              "leftValue": "={{ $json.mensagem_de_grupo }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            },
+            {
+              "id": "has_text",
+              "leftValue": "={{ $json.mensagem }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "has_phone",
+              "leftValue": "={{ $json.telefone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        -2368,
+        -1120
+      ],
+      "id": "354793a6-6fc2-45e4-ab3f-9ed9871ed776",
+      "name": "Filtrar Mensagens"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ ($json.telefone && $json.telefone.toString().trim()) ? `SELECT message FROM n8n_chat_histories WHERE session_id = '${$json.telefone.toString().trim()}' ORDER BY created_at DESC LIMIT 10` : 'SELECT NULL as message WHERE false' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1968,
+        -1120
+      ],
+      "id": "1598245d-c7f9-4297-83e6-eb03d657c235",
+      "name": "Buscar Histórico",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "SFdqGBd62rWQz4UH",
+          "name": "Postgres account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $('Filtrar Mensagens').first()?.json || {};\nconst historyItems = $input.all();\n\nlet historyText = '';\nlet jaMostrouDias = false;\nif (historyItems.length > 0) {\n  historyText = '\\n\\nHISTÓRICO_DA_CONVERSA:\\n';\n  historyItems.forEach((item, idx) => {\n    try {\n      const msg = item.json.message;\n      if (typeof msg === 'string') {\n        const parsed = JSON.parse(msg);\n        if (parsed.content) {\n          const content = parsed.content.toLowerCase();\n          historyText += `[${idx + 1}] ${parsed.type === 'human' ? 'Cliente' : 'Lis'}: ${parsed.content}\\n`;\n          if (parsed.type === 'ai' && (content.includes('dias disponíveis') || content.includes('qual data você prefere') || content.includes('encontrei') || content.includes('profissionais'))) {\n            jaMostrouDias = true;\n          }\n        }\n      }\n    } catch (e) {}\n  });\n}\n\nreturn {\n  ...previousData,\n  history_text: historyText,\n  history_count: historyItems.length,\n  ja_mostrou_dias: jaMostrouDias\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        -1120
+      ],
+      "id": "15f0a39a-008e-4da8-834e-0ca63dc2d286",
+      "name": "Preparar Histórico"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ ($json.telefone && $json.telefone.toString().trim()) ? `SELECT id, content, metadata, embedding FROM public.documents WHERE metadata->>'telefone' = '${$json.telefone.toString().trim()}' LIMIT 3` : 'SELECT NULL as id, NULL as content, NULL as metadata, NULL as embedding WHERE false' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1168,
+        -1120
+      ],
+      "id": "a5de5e1c-4f23-48fb-b2a5-0fcf9ffca5b5",
+      "name": "Buscar RAG Context",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "SFdqGBd62rWQz4UH",
+          "name": "Postgres account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousNodeData = $('Preparar Histórico').first()?.json || {};\nconst items = $input.all();\nconst ragDocs = items.filter(item => item.json && item.json.content && item.json.id);\n\nlet ragContext = '';\nlet nomePaciente = '';\n\n// Busca nome do paciente nos documentos RAG\nif (ragDocs.length > 0) {\n  ragContext = '\\n\\nCONTEXTO_CLIENTE:\\n';\n  ragDocs.forEach((doc, idx) => {\n    if (doc.json && doc.json.content) {\n      // Verifica se é informação de paciente (nome)\n      if (doc.json.metadata && doc.json.metadata.tipo === 'paciente_info') {\n        nomePaciente = doc.json.content || doc.json.metadata.nome || '';\n      } else {\n        ragContext += `[${idx + 1}] ${doc.json.content}\\n`;\n      }\n    }\n  });\n}\n\nconst contextData = {\n  telefone: (previousNodeData.telefone || '').toString().trim(),\n  mensagem: (previousNodeData.mensagem || '').toString().trim(),\n  id_mensagem: (previousNodeData.id_mensagem || '').toString().trim(),\n  timestamp: previousNodeData.timestamp || Date.now(),\n  fromMe: Boolean(previousNodeData.fromMe || false),\n  mensagem_de_grupo: Boolean(previousNodeData.mensagem_de_grupo || false),\n  mensagem_de_audio: Boolean(previousNodeData.mensagem_de_audio || false),\n  subscriber_id: (previousNodeData.subscriber_id || 'clinicorp').toString().trim(),\n  code_link: (previousNodeData.code_link || 'teste').toString().trim(),\n  business_id: (previousNodeData.business_id || '').toString().trim(),\n  id_conversa: (previousNodeData.id_conversa || '').toString().trim(),\n  wa_chatid: (previousNodeData.wa_chatid || '').toString().trim(),\n  telegram_chat_id: (previousNodeData.telegram_chat_id || '-1002525748016').toString().trim(),\n  BaseUrl: (previousNodeData.BaseUrl || '').toString().trim(),\n  token: (previousNodeData.token || '').toString().trim(),\n  instancia: (previousNodeData.instancia || '').toString().trim(),\n  api_local_url: (previousNodeData.api_local_url || 'https://7811d9b534ad.ngrok-free.app').toString().trim(),\n  rag_context: ragContext,\n  rag_empty: ragDocs.length === 0,\n  history_text: (previousNodeData.history_text || '').toString(),\n  history_count: previousNodeData.history_count || 0,\n  nome_paciente: nomePaciente.toString().trim()\n};\n\n// Armazenar no customData para uso nas ferramentas\n$execution.customData.set('telefone', contextData.telefone);\n$execution.customData.set('nome_paciente', contextData.nome_paciente);\n$execution.customData.set('subscriber_id', contextData.subscriber_id);\n$execution.customData.set('code_link', contextData.code_link);\n$execution.customData.set('business_id', contextData.business_id);\n$execution.customData.set('id_conversa', contextData.id_conversa);\n$execution.customData.set('telegram_chat_id', contextData.telegram_chat_id);\n$execution.customData.set('BaseUrl', contextData.BaseUrl);\n$execution.customData.set('token', contextData.token);\n$execution.customData.set('api_local_url', contextData.api_local_url);\n\nreturn contextData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        -1120
+      ],
+      "id": "3eb70ff1-a941-4fc0-ae08-5736b6ceb904",
+      "name": "Preparar Contexto"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensagem }}",
+        "options": {
+          "systemMessage": "={{ 'HOJE: ' + $now.format('YYYY-MM-DD HH:mm') + String.fromCharCode(10) + String.fromCharCode(10) + 'telefone: ' + ($json.telefone || '').toString() + String.fromCharCode(10) + 'nome_paciente: ' + ($json.nome_paciente || '').toString() + String.fromCharCode(10) + 'id_conversa: ' + ($json.id_conversa || '').toString() + String.fromCharCode(10) + 'subscriber_id: ' + ($json.subscriber_id || 'clinicorp').toString() + String.fromCharCode(10) + 'code_link: ' + ($json.code_link || 'teste').toString() + String.fromCharCode(10) + 'business_id: ' + ($json.business_id || '').toString() + String.fromCharCode(10) + ($json.history_text || '').toString() + ($json.rag_context || '').toString() }}\n\nVocê é a Lis, atendente do WhatsApp da Clínica Essenciallis.\n\nCOLETA DE NOME - REGRA IMPORTANTE:\n\nIMPORTANTE: Você DEVE coletar o nome completo do cliente ANTES de criar qualquer agendamento.\n\n- Se nome_paciente estiver vazio ou não informado, você DEVE perguntar: \"Para começar, por favor, me diga seu nome completo para que eu possa ajudar você da melhor forma.\"\n- Quando o cliente informar o nome (ex: \"Gustavo\", \"Maria Silva\", \"João Pedro Santos\"), use IMEDIATAMENTE a ferramenta Salvar_nome_paciente SILENCIOSAMENTE (sem mencionar ao cliente).\n- Após usar Salvar_nome_paciente, responda de forma NATURAL usando o nome do cliente, SEM mencionar que salvou ou processou algo. Exemplo: \"Ótimo, Gustavo! Como posso ajudar você hoje?\"\n- NÃO mencione termos técnicos como \"salvar\", \"salvo\", \"processado\", \"registrado\", \"armazenado\".\n- NÃO crie agendamento sem ter o nome do cliente salvo.\n- Se já tiver nome_paciente informado, use-o naturalmente na conversa (ex: \"Olá Gustavo!\").\n\nPRIMEIRA MENSAGEM - REGRA OBRIGATÓRIA:\n\nQuando cliente enviar mensagens simples como \"oi\", \"olá\", \"bom dia\", \"boa tarde\" e NÃO houver histórico de conversa anterior (history_text vazio ou muito curto), você DEVE SEMPRE responder com esta mensagem EXATA:\n\n\"Bem-vindo(a) à Essenciallis! Sou a Lis e estou aqui para te ajudar a encontrar o melhor procedimento para você. Para começar, por favor, me diga seu nome completo para que eu possa ajudar você da melhor forma. Também posso tirar dúvidas ou ajudar a agendar uma consulta. Como posso ajudar hoje?\"\n\nCOMO DETECTAR PRIMEIRA MENSAGEM:\n- Cliente diz apenas: \"oi\", \"olá\", \"bom dia\", \"boa tarde\", \"bom dia\", \"oi tudo bem\"\n- E não há histórico de conversa anterior (history_count = 0 ou history_text vazio)\n- Neste caso, SEMPRE use a mensagem de boas-vindas completa\n\nREGRAS CRÍTICAS:\n- NUNCA use mensagens genéricas como \"Olá! Como posso ajudar você hoje?\" ou \"Oi! Tudo bem?\"\n- NUNCA use apenas \"Olá! Como posso ajudar?\"\n- SEMPRE use a mensagem de boas-vindas completa acima quando for primeira interação\n- Seja acolhedora, mas direta\n- Ofereça sempre as duas opções: agendamento ou dúvidas\n- Esta é a ÚNICA mensagem permitida para primeira interação\n- SEMPRE peça o nome completo na primeira mensagem\n\nSe cliente já interagiu antes (há histórico de conversa) e está continuando, você pode ser mais direta, mas na primeira mensagem SEMPRE use a mensagem de boas-vindas completa.\n\nREGRAS GERAIS:\n- Mensagens curtas e naturais (máximo 150 tokens)\n- Tom acolhedor e humano\n- Sempre conduza para agendamento após responder dúvidas\n- Não diga que é assistente virtual ou bot\n- NUNCA use \"Olá! Como posso ajudar você hoje?\" ou variações genéricas\n- Para primeira mensagem (quando cliente diz apenas \"oi\", \"olá\"), SEMPRE use a mensagem de boas-vindas completa\n- SEMPRE colete o nome completo antes de criar agendamento\n- Quando cliente informar o nome, responda naturalmente usando o nome dele. Exemplos: \"Ótimo, Gustavo! Como posso ajudar?\" ou \"Perfeito, Maria! Você gostaria de agendar uma consulta?\"\n- NUNCA mencione termos técnicos como \"salvar\", \"salvo\", \"processado\", \"registrado\", \"armazenado\", \"dados\", \"sistema\", \"banco de dados\"\n- Se houver erro ao salvar o nome, NÃO mencione o erro técnico. Apenas continue a conversa naturalmente\n\nAGENDAMENTO - FLUXO NATURAL:\n\nPASSO 1 - Cliente pede agendamento:\nQuando cliente mencionar: \"agendar\", \"agenda\", \"agendamento\", \"consulta\", \"horário\", \"disponível\", \"marcar\", \"marcação\", \"quero\", \"preciso\":\n\nPergunte de forma natural: \"Qual seria o melhor período ou horário para você?\"\n\nPASSO 1B - Cliente menciona data específica:\nSe cliente mencionar data junto com pedido de agendamento (\"agendar amanhã\", \"consulta segunda\", \"hoje\", \"amanhã\"):\n1. Identifique a data mencionada\n2. Pergunte: \"Qual período você prefere? Manhã, tarde ou noite?\"\n3. Aguarde resposta sobre período\n\nPASSO 2 - Cliente informa preferência:\nCliente pode responder: \"manhã\", \"tarde\", \"noite\", \"início da manhã\", \"fim da tarde\", horário específico como \"10h\", \"14h\", ou data como \"amanhã\", \"segunda-feira\", etc.\n\nPASSO 3 - Buscar disponibilidade:\n1. Se cliente mencionou data específica (amanhã, segunda, etc), converta para formato YYYY-MM-DD\n2. Se não mencionou data, use amanhã como padrão\n3. Use Buscar_agendas_disponiveis com parâmetro data (YYYY-MM-DD)\n4. Aguarde resultado antes de filtrar horários\n\nPASSO 4 - Filtrar e sugerir horários:\n\nIMPORTANTE: NÃO mostre todos os horários de uma vez. Filtre baseado na preferência do cliente e apresente de forma NATURAL e CONVERSACIONAL:\n\n- Se cliente disse \"manhã\": filtre horários das 10h às 12h\n- Se cliente disse \"tarde\": filtre horários das 14h às 17h\n- Se cliente disse \"noite\": filtre horários das 17h às 20h\n- Se cliente disse horário específico (ex: \"10h\"): mostre horários próximos\n- Se não especificou período: mostre horários variados representando manhã, tarde e noite\n\nFormato de apresentação NATURAL (SEJA CONVERSACIONAL):\n\nExemplo 1 - Poucos horários disponíveis:\n\"Temos disponibilidade [DATA] às [10:00] e às [11:00]. Qual horário se encaixa melhor para você?\"\n\nExemplo 2 - Vários horários no mesmo período:\n\"Temos disponibilidade [DATA] das [10:00] até às [11:30]. Qual horário se encaixa melhor para você?\"\n\nExemplo 3 - Horários variados:\n\"Temos disponibilidade [DATA] às [10:00], às [14:00] e às [17:00]. Qual desses horários funciona melhor?\"\n\nREGRAS:\n- Seja natural: \"temos disponibilidade das X até às Y\" ou \"às X e às Y\"\n- NÃO liste todos os horários individuais\n- NÃO mencione nomes de profissionais\n- Apresente de forma fluida e conversacional\n- Pergunte sempre: \"Qual horário se encaixa melhor para você?\" ou \"Qual desses horários funciona melhor?\"\n\nNÃO faça:\n- Listar todos os profissionais\n- Mostrar formato [10:00] [10:30] [11:00] como lista\n- Ser robótico ou formal\n\nPASSO 5 - Cliente escolhe horário:\nQuando cliente escolher um horário específico (ex: \"10:00\", \"às 10h\", \"o das 14:30\"):\n\n1. Repita o horário escolhido: \"Perfeito! Então seria [DATA] às [HORA], correto?\"\n2. Pergunte antes de confirmar: \"Posso confirmar esse horário para você?\"\n3. Aguarde confirmação do cliente (\"sim\", \"pode\", \"confirmar\", \"ok\")\n\nPASSO 6 - Criar agendamento:\nApós cliente confirmar:\n1. Use Criar_agendamento_local com: profissional_id, data, hora_inicio, hora_fim\n2. Após sucesso, confirme: \"Perfeito! Agendamento confirmado para [DATA] às [HORA]. Te espero aqui na Essenciallis!\"\n3. Se houver erro, peça desculpas e sugira outro horário\n\nIMPORTANTE:\n- Se não houver horários no período desejado, sugira data mais próxima com horários disponíveis\n- Sempre pergunte antes de confirmar: \"Posso confirmar esse horário para você?\"\n- Seja natural e conversacional, não robótico\n\nPROCEDIMENTOS:\n\nResponda de forma BREVE (2-3 linhas) sobre procedimentos principais:\n\nFACIAIS: Botox, Preenchimento labial/olheiras/malar, Rinomodelação, Microagulhamento, Peeling retinóico, Laser Lavieen, Herus HIFU 4D, Bioestimulador de colágeno, Limpeza de pele Premium\n\nCORPORAIS: Harmonização de glúteos, Criolipólise, Radiofrequência, Enzimas para gordura localizada, Drenagem linfática\n\nPROTOCOLOS: Skin Code Essence, Sculpt CrioEssence, Slim Shape Essenciallis, Harmony Essence\n\nApós explicar procedimento, SEMPRE ofereça: \"Quer agendar uma avaliação para conhecer melhor?\"\n\nVALORES:\nNÃO informe valores. Use Escalar_humano imediatamente e diga: \"Para valores e condições, vou conectar você com nossa equipe especializada.\"\n\nCLÍNICA:\nEndereço: R. Gen. Eurico Gaspar Dutra, 916 - Estreito, Florianópolis - SC\nTelefone: (48) 3771-1010\nHorário: Segunda a Sexta, 10h às 20h\nFechado: Sábados, Domingos e Feriados\n\nFORMAS DE PAGAMENTO: Pix/dinheiro, Cartão de crédito (sem juros), Boleto (com juros)\n\nFERRAMENTAS:\n- Salvar_nome_paciente: Use IMEDIATAMENTE quando cliente informar seu nome completo. Parâmetro: nome (nome completo do paciente). IMPORTANTE: Use SILENCIOSAMENTE - NÃO mencione ao cliente que está salvando. Apenas responda naturalmente usando o nome dele.\n- Buscar_profissionais_disponiveis: Use SEM PARÂMETROS quando cliente pedir agendamento\n- Buscar_agendas_disponiveis: Parâmetro data (YYYY-MM-DD) - use após cliente escolher data\n- Criar_agendamento_local: Parâmetros: profissional_id, data, hora_inicio, hora_fim (NÃO use sem ter o nome do cliente salvo)\n- Buscar_eventos_agenda: Lista agendamentos existentes\n- Escalar_humano: Use para valores, urgências ou insatisfação\n\nIMPORTANTE:\n- Use as ferramentas de forma direta, sem loops\n- Após usar ferramenta, apresente resultado e aguarde resposta do cliente\n- Não repita a mesma ferramenta sem necessidade\n- Seja objetivo e eficiente\n- SEMPRE salve o nome do cliente quando ele informar usando Salvar_nome_paciente, mas NÃO mencione isso ao cliente\n- NÃO crie agendamento sem ter o nome do cliente salvo\n- NUNCA mencione termos técnicos como \"salvar\", \"salvo\", \"processado\", \"registrado\", \"armazenado\" ao cliente\n- Seja natural e conversacional - use o nome do cliente normalmente sem mencionar processos técnicos"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -368,
+        -1120
+      ],
+      "id": "fabc79f8-a3b3-48f0-b6cc-ea9b2836e285",
+      "name": "Agente Lis",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "maxTokens": 300,
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        -912
+      ],
+      "id": "95677b81-f9be-489e-9c09-cc80f78d5ba8",
+      "name": "OpenAI Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ivx32fXd91n6WkDT",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ ($('Extrair Dados').item.json.telefone || '').toString() }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        -720
+      ],
+      "id": "a31b8aef-a52e-4c06-925f-b01ea046de0c",
+      "name": "Window Buffer Memory"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extrair Dados').item.json.telefone }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        -512
+      ],
+      "id": "4cf1059f-12ed-49f9-83b8-91b39f7a9eeb",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "SFdqGBd62rWQz4UH",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Busca profissionais disponíveis com suas agendas. Use IMEDIATAMENTE quando cliente pedir agendamento ou verificar disponibilidade.\n\nRetorna lista de profissionais com horários disponíveis para os próximos 7 dias.\n\n**PALAVRAS-CHAVE:** agendar, agendamento, consulta, horário, disponível, marcar, marcação, amanhã, hoje, quero, preciso\n\n**COMO USAR:** Chame SEM PARÂMETROS quando detectar pedido de agendamento.",
+        "method": "GET",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/agenda/profissionais",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "com_agendas",
+              "value": "true"
+            },
+            {
+              "name": "dias_futuros",
+              "value": "7"
+            },
+            {
+              "name": "hora_inicio",
+              "value": "10"
+            },
+            {
+              "name": "hora_fim",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -912
+      ],
+      "id": "63ae340d-83e1-4e6d-b393-95759f3f22ef",
+      "name": "Buscar_profissionais_disponiveis"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Busca horários disponíveis para uma data específica.\n\nParâmetros:\n- data: Data no formato YYYY-MM-DD (OBRIGATÓRIO)\n\nUse após o cliente escolher uma data.",
+        "method": "GET",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/agenda/disponiveis",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "data",
+              "value": "{data}"
+            },
+            {
+              "name": "hora_inicio",
+              "value": "10"
+            },
+            {
+              "name": "hora_fim",
+              "value": "20"
+            }
+          ]
+        },
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "data",
+              "description": "Data no formato YYYY-MM-DD"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -720
+      ],
+      "id": "0eee1660-c468-4cf8-8b4c-5cd580124aa7",
+      "name": "Buscar_agendas_disponiveis"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cria um novo agendamento via API local.\n\nParâmetros OBRIGATÓRIOS:\n- profissional_id: ID do profissional escolhido\n- data: Data no formato YYYY-MM-DD\n- hora_inicio: Hora de início no formato HH:MM (ex: 10:00)\n- hora_fim: Hora de fim no formato HH:MM (ex: 11:00)\n\nO paciente_id e telefone são incluídos automaticamente.",
+        "method": "POST",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/agenda/criar",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"paciente_id\": \"6361978434027520\", \"profissional_id\": \"{profissional_id}\", \"data\": \"{data}\", \"hora_inicio\": \"{hora_inicio}\", \"hora_fim\": \"{hora_fim}\", \"observacoes\": \"Agendamento via WhatsApp - Nome: {{ $execution.customData.get('nome_paciente') || 'Não informado' }} - Telefone: {{ $execution.customData.get('telefone') || '' }}\", \"telefone\": \"{{ $execution.customData.get('telefone') || '' }}\"}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "profissional_id",
+              "description": "ID do profissional escolhido"
+            },
+            {
+              "name": "data",
+              "description": "Data no formato YYYY-MM-DD"
+            },
+            {
+              "name": "hora_inicio",
+              "description": "Hora de início no formato HH:MM (ex: 10:00)"
+            },
+            {
+              "name": "hora_fim",
+              "description": "Hora de fim no formato HH:MM (ex: 11:00)"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -512
+      ],
+      "id": "62199d2f-3b96-4608-a5ce-36eede5dc317",
+      "name": "Criar_agendamento_local"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Força uma sincronização manual da agenda com o Clinicorp. Use quando precisar atualizar os dados da agenda ou quando os dados parecerem desatualizados.",
+        "method": "POST",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/agenda/sync",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -320
+      ],
+      "id": "2f1d63d1-2845-4c26-a6f3-350d8b046e08",
+      "name": "Sincronizar_agenda"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Busca eventos da agenda. Retorna lista de agendamentos existentes.\n\nParâmetros opcionais:\n- ocupado: boolean - Filtrar por ocupado/livre\n- data_inicio: string - Data inicial ISO\n- data_fim: string - Data final ISO\n- profissional_id: string - Filtrar por profissional\n- limit: number - Limite de resultados (padrão: 50)",
+        "method": "GET",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/agenda/eventos",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -112
+      ],
+      "id": "c1406454-a771-45e1-9860-7a848d4c3279",
+      "name": "Buscar_eventos_agenda"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Salva o nome completo do paciente no banco de dados. Use IMEDIATAMENTE quando o cliente informar seu nome.\n\nIMPORTANTE: Use esta ferramenta SILENCIOSAMENTE - NÃO mencione ao cliente que está salvando ou processando. Apenas responda naturalmente usando o nome dele após usar a ferramenta.\n\nParâmetros OBRIGATÓRIOS:\n- nome: Nome completo do paciente (ex: \"Gustavo Silva\", \"Maria Santos\")\n\nO telefone é incluído automaticamente.",
+        "method": "POST",
+        "url": "https://7811d9b534ad.ngrok-free.app/api/paciente/salvar-nome",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"telefone\": \"{{ $execution.customData.get('telefone') || '' }}\", \"nome\": \"{nome}\"}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "nome",
+              "description": "Nome completo do paciente"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        96
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Salvar_nome_paciente"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Escala para atendimento humano quando necessário.\n\nUse quando:\n- Urgência médica\n- Insatisfação do cliente\n- Assuntos fora do escopo\n- Pedido de atendimento humano\n- Dúvidas sobre valores\n\nFormato da mensagem:\nUsuário <nome> (<telefone>) precisa de atenção imediata.\n\nÚltima mensagem:\n---\n<mensagem>",
+        "chatId": "={{ ($execution.customData.get('telegram_chat_id') || '-1002525748016').toString() }}",
+        "text": "={{ (() => { try { return (($fromAI('Text', 'Mensagem de escalação', 'string') || '').toString()).trim(); } catch(e) { return 'Escalação necessária - Telefone: ' + ($execution.customData.get('telefone') || 'N/A'); } })() }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [
+        48,
+        96
+      ],
+      "id": "02405d99-f819-4e70-b17e-e758db1307c5",
+      "name": "Escalar_humano",
+      "webhookId": "d045a8c1-ec1b-4d20-8226-457aa18934af",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "description": "Use para refletir sobre operações complexas antes/depois de executá-las. Útil para planejar a melhor abordagem antes de chamar ferramentas."
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        48,
+        288
+      ],
+      "id": "0675c84e-ad2d-4e94-ad76-9aba16f65177",
+      "name": "Refletir"
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentData = $input.first().json;\nconst originalData = $('Preparar Contexto').first().json || {};\n\nreturn {\n  ...originalData,\n  output: agentData.output || '',\n  resposta: (agentData.output || '').trim()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -1120
+      ],
+      "id": "415d2bf8-8366-4647-a8f2-882afc9282a7",
+      "name": "Preparar Resposta Agente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nlet cleaned = (data.resposta || data.output || '')\n  .replace(/\\*\\*/g, '*')\n  .replace(/#/g, '')\n  .replace(/[\\u{1F300}-\\u{1F9FF}]/gu, '')\n  .replace(/\\\\n/g, '\\n')\n  .trim();\n\nif (!cleaned) {\n  cleaned = 'Desculpe, não consegui processar sua mensagem. Pode repetir?';\n}\n\nreturn {\n  ...data,\n  resposta: cleaned\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -1120
+      ],
+      "id": "89f462c7-b9c9-4fab-bda3-ffd54b8f119b",
+      "name": "Formatar Resposta"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($json.BaseUrl || '').toString() }}/send/text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "token",
+              "value": "={{ ($json.token || '').toString() }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ ($json.wa_chatid || '').toString() }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ ($json.resposta || '').toString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        848,
+        -1120
+      ],
+      "id": "8bdd6efd-f333-4431-babb-7ada4b8a7a3e",
+      "name": "Enviar Mensagem",
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extrair Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Dados": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Buscar Histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Histórico": {
+      "main": [
+        [
+          {
+            "node": "Preparar Histórico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Histórico": {
+      "main": [
+        [
+          {
+            "node": "Buscar RAG Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar RAG Context": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto": {
+      "main": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Lis": {
+      "main": [
+        [
+          {
+            "node": "Preparar Resposta Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Resposta Agente": {
+      "main": [
+        [
+          {
+            "node": "Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_profissionais_disponiveis": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_agendas_disponiveis": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar_agendamento_local": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sincronizar_agenda": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_eventos_agenda": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar_nome_paciente": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refletir": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8a891d65-0a46-47ed-8ef1-72eb791cdbe1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6261c20191d6dffb44c21782a91eb32d9e143bf78678887b146474f6dfe3fefc"
+  },
+  "id": "Jee1qMByBlgiWPHV",
+  "tags": []
+}

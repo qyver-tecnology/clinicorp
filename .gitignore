@@ -1,0 +1,62 @@
+# Tokens e credenciais
+token.json
+agenda_data.json
+*.log
+.env
+*.backup
+
+# Arquivos de teste
+teste.json
+*test*.json
+*_test.py
+test_*.py
+*_backup.json
+
+# Diretórios de dados
+data/
+logs/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Flask
+instance/
+.webassets-cache
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
