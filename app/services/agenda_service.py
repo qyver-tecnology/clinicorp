@@ -891,18 +891,19 @@ class AgendaService:
                                 jsonb_set(
                                     jsonb_set(
                                         COALESCE(metadata, '{}'::jsonb),
-                                        '{nome}', to_jsonb(:nome::text)
+                                        '{nome}', to_jsonb(:nome_val)
                                     ),
-                                    '{paciente_id}', to_jsonb(:paciente_id::text)
+                                    '{paciente_id}', to_jsonb(:paciente_id_val)
                                 ),
-                                '{email}', to_jsonb(:email::text)
+                                '{email}', to_jsonb(:email_val)
                             )
                         WHERE id = :doc_id
                     """)
                     session.execute(update_query, {
                         'nome': nome,
-                        'paciente_id': paciente_id,
-                        'email': email,
+                        'nome_val': nome,
+                        'paciente_id_val': paciente_id,
+                        'email_val': email,
                         'doc_id': result[0]
                     })
                     logger.info(f"✅ Paciente atualizado no banco local: {nome} (ID Clinicorp: {paciente_id})")

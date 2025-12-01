@@ -556,12 +556,12 @@ def salvar_nome_paciente():
                             metadata = jsonb_set(
                                 COALESCE(metadata, '{}'::jsonb),
                                 '{nome}',
-                                to_jsonb(:nome::text)
+                                to_jsonb(:nome_valor)
                             ),
                             created_at = COALESCE(created_at, CURRENT_TIMESTAMP)
                         WHERE id = :doc_id
                     """)
-                    session.execute(update_query, {'nome': nome, 'doc_id': doc_id})
+                    session.execute(update_query, {'nome': nome, 'nome_valor': nome, 'doc_id': doc_id})
                     logger.info(f"✅ Nome atualizado para telefone {telefone}: {nome}")
                 else:
                     # Cria novo documento
