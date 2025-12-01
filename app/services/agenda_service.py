@@ -988,4 +988,78 @@ class AgendaService:
                 'sucesso': False,
                 'erro': str(e)
             }
+    
+    def buscar_agendamentos_por_telefone(self, telefone: str) -> list:
+        """
+        Busca agendamentos futuros do paciente pelo telefone
+        
+        Args:
+            telefone: Telefone do paciente
+            
+        Returns:
+            Lista de agendamentos futuros formatados
+        """
+        try:
+            from app.database import get_db
+            db = get_db()
+            
+            if not db.is_connected():
+                logger.warning("Banco de dados não conectado")
+                return []
+            
+            agendamentos = []
+            
+            try:
+                with db.get_session() as session:
+                    from sqlalchemy import text
+                    from datetime import datetime
+                    import pytz
+                    
+                    tz_brasil = pytz.timezone('America/Sao_Paulo')
+                    agora = datetime.now(tz_brasil)
+                    
+                    # Busca agendamentos futuros do paciente
+                    query = text("""
+                        SELECT 
+                            id,
+                            data_agendamento,
+                            hora_inicio,
+                            hora_fim,
+                            profissional_nome,
+                            procedimento,
+                            status,
+                            metadata
+                        FROM agendamentos
+                        WHERE metadata->>'telefone' = :telefone
+                        AND data_agendamento >= CURRENT_DATE
+                        ORDER BY data_agendamento ASC, hora_inicio ASC
+                        LIMIT 5
+                    """)
+                    
+                    results = session.execute(query, {'telefone': telefone}).fetchall()
+                    
+                    for row in results:
+                        agendamento = {
+                            'id': row[0],
+                            'data': row[1].strftime('%d/%m/%Y') if row[1] else '',
+                            'hora_inicio': row[2],
+                            'hora_fim': row[3],
+                            'profissional': row[4],
+                            'procedimento': row[5],
+                            'status': row[6],
+                            'texto': f"{row[1].strftime('%d/%m/%Y')} às {row[2]} - {row[5] or 'Consulta'}"
+                        }
+                        agendamentos.append(agendamento)
+                    
+                    logger.info(f"✅ Encontrados {len(agendamentos)} agendamentos para {telefone}")
+                    
+            except Exception as e:
+                logger.error(f"Erro ao buscar agendamentos no banco: {e}")
+                return []
+            
+            return agendamentos
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar agendamentos por telefone: {e}")
+            return []
 

@@ -665,3 +665,34 @@ def buscar_nome_paciente():
         logger.error(f"Erro ao buscar nome do paciente: {e}")
         return jsonify({'erro': str(e)}), 500
 
+
+@api_bp.route('/paciente/agendamentos', methods=['GET'])
+def buscar_agendamentos_paciente():
+    """
+    Busca agendamentos existentes do paciente pelo telefone
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+    
+    Retorna:
+        Lista de agendamentos futuros do paciente
+    """
+    try:
+        telefone = request.args.get('telefone', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Parametro "telefone" e obrigatorio'}), 400
+        
+        agendamentos = agenda_service.buscar_agendamentos_por_telefone(telefone)
+        
+        return jsonify({
+            'sucesso': True,
+            'telefone': telefone,
+            'agendamentos': agendamentos,
+            'total': len(agendamentos)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar agendamentos do paciente: {e}")
+        return jsonify({'erro': str(e)}), 500
+

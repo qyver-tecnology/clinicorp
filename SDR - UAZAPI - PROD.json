@@ -685,6 +685,43 @@
     },
     {
       "parameters": {
+        "toolDescription": "Busca agendamentos futuros do paciente pelo telefone. Use quando cliente já é conhecido para mostrar seus agendamentos.\n\nO que faz:\n- Busca todos os agendamentos futuros do paciente\n- Retorna data, hora, procedimento e profissional\n- Mostra até 5 agendamentos mais próximos\n\nNÃO requer parâmetros - usa o telefone automaticamente.\n\nUSO: Quando cliente diz 'quero ver meus agendamentos' ou 'tenho agendamento?'",
+        "url": "http://72.60.137.139:5000/api/paciente/agendamentos",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "telefone",
+              "description": "Telefone do paciente (incluído automaticamente)"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            },
+            {
+              "name": "Content-Type"
+            },
+            {
+              "name": "ngrok-skip-browser-warning"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -100
+      ],
+      "id": "3b03cd43-5ef4-44e7-9c48-8ec3e0f49b76",
+      "name": "Buscar_agendamentos_paciente"
+    },
+    {
+      "parameters": {
         "toolDescription": "Salva o nome completo do paciente no banco de dados local. Use IMEDIATAMENTE quando o cliente informar seu nome.\n\nIMPORTANTE:\n1. Use esta ferramenta SILENCIOSAMENTE - NÃO mencione ao cliente que está salvando\n2. Capture o NOME COMPLETO (nome + sobrenome) - NUNCA apenas o primeiro nome\n3. Se cliente disse 'meu nome é Gustavo Prezzoti', salve 'Gustavo Prezzoti' (COMPLETO)\n4. DEPOIS de salvar o nome, quando for criar agendamento, use Criar_paciente_clinicorp\n\nParâmetros OBRIGATÓRIOS:\n- nome: Nome COMPLETO do paciente incluindo sobrenome(s)\n\nO telefone é incluído automaticamente.",
         "method": "POST",
         "url": "http://72.60.137.139:5000/api/paciente/salvar-nome",
@@ -1110,6 +1147,17 @@
       ]
     },
     "Buscar_eventos_agenda": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_agendamentos_paciente": {
       "ai_tool": [
         [
           {
