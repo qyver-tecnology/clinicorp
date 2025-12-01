@@ -209,16 +209,20 @@ def criar_agendamento():
     """
     Cria um novo agendamento no Clinicorp
     
+    Se paciente_id não for fornecido, o sistema buscará o nome do paciente
+    pelo telefone e criará um novo paciente automaticamente no Clinicorp.
+    
     Body JSON:
-        paciente_id: ID do paciente (obrigatório)
+        paciente_id: ID do paciente (opcional - se não fornecido, cria novo paciente)
         profissional_id: ID do profissional (obrigatório)
         data: Data no formato YYYY-MM-DD (obrigatório)
         hora_inicio: Hora de início no formato HH:MM (obrigatório)
         hora_fim: Hora de fim no formato HH:MM (obrigatório)
         observacoes: Observações (opcional)
         procedimentos: Lista de procedimentos (opcional)
-        telefone: Telefone do paciente (opcional)
+        telefone: Telefone do paciente (obrigatório se paciente_id não for fornecido)
         email: Email do paciente (opcional)
+        nome_paciente: Nome do paciente (opcional - busca do banco se não fornecido)
     """
     try:
         dados = request.get_json()
@@ -228,24 +232,12 @@ def criar_agendamento():
         
         # Valida campos obrigatórios
         paciente_id = dados.get('paciente_id')
-        telefone = dados.get('telefone', '')
+        telefone = dados.get('telefone', '').strip()
         profissional_id = dados.get('profissional_id')
         data_str = dados.get('data')
         hora_inicio = dados.get('hora_inicio')
         hora_fim = dados.get('hora_fim')
-        
-        # Se não tem paciente_id, retorna erro informando que é obrigatório
-        # TODO: Implementar busca/criação de paciente por telefone na API Clinicorp
-        if not paciente_id:
-            if telefone:
-                logger.warning(f"Tentativa de criar agendamento sem paciente_id para telefone: {telefone}")
-                return jsonify({
-                    'erro': 'Campo "paciente_id" e obrigatorio',
-                    'detalhes': 'Para agendamentos via WhatsApp, é necessário ter o paciente cadastrado no sistema primeiro. Entre em contato com o suporte para cadastro.',
-                    'telefone_informado': telefone
-                }), 400
-            else:
-                return jsonify({'erro': 'Campo "paciente_id" e obrigatorio'}), 400
+        nome_paciente = dados.get('nome_paciente', '').strip()
         
         if not profissional_id:
             return jsonify({'erro': 'Campo "profissional_id" e obrigatorio'}), 400
@@ -255,6 +247,27 @@ def criar_agendamento():
             return jsonify({'erro': 'Campo "hora_inicio" e obrigatorio (formato: HH:MM)'}), 400
         if not hora_fim:
             return jsonify({'erro': 'Campo "hora_fim" e obrigatorio (formato: HH:MM)'}), 400
+        
+        # Se não tem paciente_id, precisa de telefone e nome para criar novo paciente
+        if not paciente_id:
+            if not telefone:
+                return jsonify({
+                    'erro': 'Campo "telefone" e obrigatorio quando paciente_id nao e fornecido',
+                    'detalhes': 'Para criar um novo paciente, informe o telefone.'
+                }), 400
+            
+            # Se não tem nome_paciente no request, busca do banco pelo telefone
+            if not nome_paciente:
+                nome_paciente = _buscar_nome_paciente_por_telefone(telefone)
+            
+            if not nome_paciente:
+                return jsonify({
+                    'erro': 'Nome do paciente nao encontrado',
+                    'detalhes': 'O nome do paciente deve ser coletado antes de criar o agendamento. Use a ferramenta Salvar_nome_paciente primeiro.',
+                    'telefone_informado': telefone
+                }), 400
+            
+            logger.info(f"Criando agendamento para novo paciente: {nome_paciente} (telefone: {telefone})")
         
         # Converte data
         try:
@@ -270,15 +283,16 @@ def criar_agendamento():
         
         # Cria agendamento
         resultado = agenda_service.criar_agendamento(
-            paciente_id=str(paciente_id),
+            paciente_id=str(paciente_id) if paciente_id else None,
             profissional_id=str(profissional_id),
             data=data,
             hora_inicio=hora_inicio,
             hora_fim=hora_fim,
             observacoes=dados.get('observacoes', ''),
             procedimentos=dados.get('procedimentos', []),
-            telefone=dados.get('telefone', ''),
-            email=dados.get('email', '')
+            telefone=telefone,
+            email=dados.get('email', ''),
+            nome_paciente=nome_paciente
         )
         
         if resultado.get('sucesso'):
@@ -287,7 +301,87 @@ def criar_agendamento():
             return jsonify(resultado), 400
         
     except Exception as e:
+        logger.error(f"Erro ao criar agendamento: {e}")
         return jsonify({'erro': str(e)}), 500
+
+
+def _buscar_nome_paciente_por_telefone(telefone: str) -> str:
+    """
+    Busca o nome do paciente no banco de dados pelo telefone
+    
+    Args:
+        telefone: Telefone do paciente
+        
+    Returns:
+        Nome do paciente ou string vazia se não encontrado
+    """
+    try:
+        from app.database import get_db
+        db = get_db()
+        
+        if not db.is_connected():
+            logger.warning("Banco de dados nao conectado. Nao foi possivel buscar nome do paciente.")
+            return ""
+        
+        with db.get_session() as session:
+            from sqlalchemy import text
+            
+            query = text("""
+                SELECT content, metadata 
+                FROM documents 
+                WHERE metadata->>'telefone' = :telefone 
+                AND metadata->>'tipo' = 'paciente_info'
+                LIMIT 1
+            """)
+            result = session.execute(query, {'telefone': telefone}).fetchone()
+            
+            if result:
+                # content contém o nome, ou busca do metadata
+                nome = result[0] or (result[1].get('nome', '') if result[1] else '')
+                if nome:
+                    logger.info(f"Nome do paciente encontrado para telefone {telefone}: {nome}")
+                    return nome
+            
+            logger.warning(f"Nome do paciente nao encontrado para telefone: {telefone}")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"Erro ao buscar nome do paciente: {e}")
+        return ""
+
+@api_bp.route('/paciente/buscar-clinicorp', methods=['GET'])
+def buscar_paciente_clinicorp():
+    """
+    Busca paciente na API do Clinicorp pelo telefone
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+    """
+    try:
+        telefone = request.args.get('telefone', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Parametro "telefone" e obrigatorio'}), 400
+        
+        # Busca na API do Clinicorp
+        paciente = agenda_service.agenda_api.buscar_paciente_por_telefone(telefone)
+        
+        if paciente:
+            return jsonify({
+                'encontrado': True,
+                'paciente': paciente
+            }), 200
+        else:
+            return jsonify({
+                'encontrado': False,
+                'telefone': telefone,
+                'mensagem': 'Paciente nao encontrado no Clinicorp'
+            }), 200
+            
+    except Exception as e:
+        logger.error(f"Erro ao buscar paciente no Clinicorp: {e}")
+        return jsonify({'erro': str(e)}), 500
+
 
 @api_bp.route('/paciente/salvar-nome', methods=['POST'])
 def salvar_nome_paciente():

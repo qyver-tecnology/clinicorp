@@ -776,9 +776,25 @@ class AgendaService:
             logger.error(f"Erro ao listar profissionais: {e}")
             return []
     
+    def buscar_paciente_por_telefone(self, telefone: str) -> Optional[Dict]:
+        """
+        Busca paciente na API do Clinicorp pelo telefone
+        
+        Args:
+            telefone: Telefone do paciente
+            
+        Returns:
+            Dados do paciente se encontrado, None caso contrário
+        """
+        try:
+            return self.agenda_api.buscar_paciente_por_telefone(telefone)
+        except Exception as e:
+            logger.error(f"Erro ao buscar paciente por telefone: {e}")
+            return None
+    
     def criar_agendamento(
         self,
-        paciente_id: str,
+        paciente_id: Optional[str],
         profissional_id: str,
         data: datetime,
         hora_inicio: str,
@@ -786,13 +802,17 @@ class AgendaService:
         observacoes: str = "",
         procedimentos: List[str] = None,
         telefone: str = "",
-        email: str = ""
+        email: str = "",
+        nome_paciente: str = ""
     ) -> Dict:
         """
         Cria um novo agendamento no Clinicorp
         
+        Se paciente_id não for fornecido mas nome_paciente e telefone forem,
+        a API do Clinicorp criará automaticamente um novo paciente.
+        
         Args:
-            paciente_id: ID do paciente
+            paciente_id: ID do paciente (opcional se nome_paciente e telefone forem fornecidos)
             profissional_id: ID do profissional/dentista
             data: Data do agendamento (datetime)
             hora_inicio: Hora de início (formato "HH:MM")
@@ -801,6 +821,7 @@ class AgendaService:
             procedimentos: Lista de procedimentos
             telefone: Telefone do paciente
             email: Email do paciente
+            nome_paciente: Nome do paciente (usado para criar novo paciente se paciente_id não existir)
             
         Returns:
             Dicionário com resultado do agendamento
@@ -815,7 +836,8 @@ class AgendaService:
                 observacoes=observacoes,
                 procedimentos=procedimentos,
                 telefone=telefone,
-                email=email
+                email=email,
+                nome_paciente=nome_paciente
             )
         except Exception as e:
             logger.error(f"Erro ao criar agendamento: {e}")

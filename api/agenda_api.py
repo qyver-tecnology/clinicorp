@@ -503,9 +503,145 @@ class AgendaAPI:
             logger.debug(traceback.format_exc())
             return []
     
+    def buscar_paciente_por_telefone(self, telefone: str) -> Optional[Dict]:
+        """
+        Busca paciente na API do Clinicorp pelo telefone
+        
+        Args:
+            telefone: Telefone do paciente (com ou sem formatação)
+            
+        Returns:
+            Dados do paciente se encontrado, None caso contrário
+        """
+        try:
+            # Limpa o telefone (remove formatação)
+            telefone_limpo = ''.join(filter(str.isdigit, telefone))
+            
+            if not telefone_limpo:
+                logger.warning("Telefone vazio para busca de paciente")
+                return None
+            
+            endpoint = '/solution/api/patient/search'
+            params = {
+                'name': telefone_limpo,  # Busca pelo telefone como "name"
+                'onlyPatient': 'true'
+            }
+            
+            logger.info(f"Buscando paciente pelo telefone: {telefone_limpo}")
+            
+            response = self.client.get(endpoint, use_api_url=True, params=params)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    pacientes = data.get('list') or data.get('data') or []
+                    
+                    if not isinstance(pacientes, list):
+                        pacientes = [pacientes] if pacientes else []
+                    
+                    # Procura paciente com telefone correspondente
+                    for paciente in pacientes:
+                        if not isinstance(paciente, dict):
+                            continue
+                        
+                        # Verifica se o telefone bate
+                        mobile_phone = ''.join(filter(str.isdigit, str(paciente.get('MobilePhone', ''))))
+                        phone = ''.join(filter(str.isdigit, str(paciente.get('Phone', ''))))
+                        
+                        if telefone_limpo in mobile_phone or telefone_limpo in phone or \
+                           mobile_phone in telefone_limpo or phone in telefone_limpo:
+                            logger.info(f"✅ Paciente encontrado: {paciente.get('Name')} (ID: {paciente.get('id')})")
+                            return {
+                                'id': paciente.get('id'),
+                                'nome': paciente.get('Name', ''),
+                                'telefone': paciente.get('MobilePhone', ''),
+                                'email': paciente.get('Email', ''),
+                                'dados_originais': paciente
+                            }
+                    
+                    # Se não encontrou por telefone, tenta buscar diretamente pelo telefone formatado
+                    # Alguns sistemas guardam com formatação
+                    logger.debug(f"Paciente não encontrado na primeira busca, tentando busca alternativa...")
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao processar resposta de busca de paciente: {e}")
+            else:
+                logger.warning(f"Busca de paciente retornou status {response.status_code}")
+            
+            logger.info(f"Paciente não encontrado para telefone: {telefone}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar paciente por telefone: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
+    
+    def buscar_paciente_por_nome(self, nome: str) -> List[Dict]:
+        """
+        Busca pacientes na API do Clinicorp pelo nome
+        
+        Args:
+            nome: Nome do paciente (parcial ou completo)
+            
+        Returns:
+            Lista de pacientes encontrados
+        """
+        try:
+            if not nome or len(nome.strip()) < 2:
+                logger.warning("Nome muito curto para busca de paciente")
+                return []
+            
+            endpoint = '/solution/api/patient/search'
+            params = {
+                'name': nome.strip(),
+                'onlyPatient': 'true'
+            }
+            
+            logger.info(f"Buscando paciente pelo nome: {nome}")
+            
+            response = self.client.get(endpoint, use_api_url=True, params=params)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    pacientes_raw = data.get('list') or data.get('data') or []
+                    
+                    if not isinstance(pacientes_raw, list):
+                        pacientes_raw = [pacientes_raw] if pacientes_raw else []
+                    
+                    pacientes = []
+                    for paciente in pacientes_raw:
+                        if not isinstance(paciente, dict):
+                            continue
+                        
+                        pacientes.append({
+                            'id': paciente.get('id'),
+                            'nome': paciente.get('Name', ''),
+                            'telefone': paciente.get('MobilePhone', ''),
+                            'email': paciente.get('Email', ''),
+                            'dados_originais': paciente
+                        })
+                    
+                    logger.info(f"✅ Encontrados {len(pacientes)} pacientes para busca '{nome}'")
+                    return pacientes
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao processar resposta de busca de paciente: {e}")
+            else:
+                logger.warning(f"Busca de paciente retornou status {response.status_code}")
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar paciente por nome: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return []
+
     def criar_agendamento(
         self,
-        paciente_id: str,
+        paciente_id: Optional[str],
         profissional_id: str,
         data: datetime,
         hora_inicio: str,
@@ -513,13 +649,17 @@ class AgendaAPI:
         observacoes: str = "",
         procedimentos: List[str] = None,
         telefone: str = "",
-        email: str = ""
+        email: str = "",
+        nome_paciente: str = ""
     ) -> Dict:
         """
         Cria um novo agendamento no Clinicorp
         
+        Se paciente_id não for fornecido mas nome_paciente e telefone forem,
+        a API do Clinicorp criará automaticamente um novo paciente.
+        
         Args:
-            paciente_id: ID do paciente
+            paciente_id: ID do paciente (opcional se nome_paciente e telefone forem fornecidos)
             profissional_id: ID do profissional/dentista
             data: Data do agendamento (datetime)
             hora_inicio: Hora de início (formato "HH:MM")
@@ -528,6 +668,7 @@ class AgendaAPI:
             procedimentos: Lista de procedimentos
             telefone: Telefone do paciente
             email: Email do paciente
+            nome_paciente: Nome do paciente (usado para criar novo paciente se paciente_id não existir)
             
         Returns:
             Dicionário com resultado do agendamento
@@ -542,9 +683,21 @@ class AgendaAPI:
             # Calcula AtomicDate (YYYYMMDD)
             atomic_date = int(data.strftime('%Y%m%d'))
             
+            # Determina se é um novo paciente ou paciente existente
+            is_new_patient = not paciente_id or paciente_id == "" or paciente_id == "None"
+            
+            # Se não tem paciente_id mas tem telefone, tenta buscar paciente existente
+            if is_new_patient and telefone:
+                logger.info(f"Buscando paciente existente pelo telefone: {telefone}")
+                paciente_existente = self.buscar_paciente_por_telefone(telefone)
+                
+                if paciente_existente and paciente_existente.get('id'):
+                    paciente_id = str(paciente_existente['id'])
+                    is_new_patient = False
+                    logger.info(f"✅ Paciente encontrado no Clinicorp: {paciente_existente.get('nome')} (ID: {paciente_id})")
+            
             # Prepara dados do agendamento
             agendamento_data = {
-                "Patient_PersonId": int(paciente_id),
                 "Dentist_PersonId": int(profissional_id),
                 "date": data_iso,
                 "referenceMonth": "",
@@ -567,16 +720,16 @@ class AgendaAPI:
                 "ScheduleToId": int(profissional_id),
                 "AtomicDate": atomic_date,
                 "Clinic_BusinessId": int(clinic_id),
-                "AddInfo": {"AddInfo1": ""},
+                "AddInfo": {"AddInfo1": "Confirmation,"},
                 "AlertInfo": {
-                    "ConfirmSchedule": "0H",
+                    "ConfirmSchedule": "1D",
                     "AlertSchedule": "0H",
-                    "ConfirmCliniMe": "",
                     "ConfirmWhats": "",
-                    "ConfirmSms": "",
-                    "AlertCliniMe": "",
+                    "ConfirmSms": "X",
                     "AlertWhats": "",
-                    "AlertSms": ""
+                    "AlertSms": "",
+                    "AlertCliniMe": "",
+                    "ConfirmCliniMe": ""
                 },
                 "Email": email,
                 "MobilePhone": telefone,
@@ -587,7 +740,28 @@ class AgendaAPI:
                 "_AccessPath": "*.Calendar.Appointment.Create"
             }
             
-            logger.info(f"Criando agendamento para paciente {paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
+            if is_new_patient:
+                # Novo paciente - API do Clinicorp cria automaticamente
+                if not nome_paciente:
+                    return {
+                        'sucesso': False,
+                        'erro': 'Nome do paciente é obrigatório para criar novo paciente'
+                    }
+                if not telefone:
+                    return {
+                        'sucesso': False,
+                        'erro': 'Telefone é obrigatório para criar novo paciente'
+                    }
+                
+                agendamento_data["isNew"] = "X"
+                agendamento_data["Name"] = nome_paciente
+                logger.info(f"Criando agendamento com NOVO PACIENTE '{nome_paciente}' (telefone: {telefone}) com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
+            else:
+                # Paciente existente
+                agendamento_data["Patient_PersonId"] = int(paciente_id)
+                logger.info(f"Criando agendamento para paciente existente {paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
+            
+            logger.debug(f"Payload do agendamento: {agendamento_data}")
             
             response = self.client.post(
                 endpoint,
@@ -601,10 +775,19 @@ class AgendaAPI:
             if response.status_code == 200:
                 try:
                     resultado = response.json()
-                    logger.info("✅ Agendamento criado com sucesso")
+                    patient_id_criado = resultado.get('Patient_PersonId')
+                    patient_name = resultado.get('PatientName') or resultado.get('Name')
+                    
+                    if is_new_patient and patient_id_criado:
+                        logger.info(f"✅ Agendamento criado com sucesso! Novo paciente criado: {patient_name} (ID: {patient_id_criado})")
+                    else:
+                        logger.info("✅ Agendamento criado com sucesso")
+                    
                     return {
                         'sucesso': True,
-                        'dados': resultado
+                        'dados': resultado,
+                        'paciente_criado': is_new_patient,
+                        'paciente_id': patient_id_criado
                     }
                 except:
                     logger.info("✅ Agendamento criado com sucesso (resposta não JSON)")
