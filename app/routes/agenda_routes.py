@@ -250,6 +250,7 @@ def criar_agendamento():
         
         # Se não tem paciente_id, precisa de telefone e nome para criar novo paciente
         if not paciente_id:
+            logger.info(f"Paciente ID não fornecido, verificando telefone para criar novo paciente")
             if not telefone:
                 return jsonify({
                     'erro': 'Campo "telefone" e obrigatorio quando paciente_id nao e fornecido',
@@ -267,7 +268,9 @@ def criar_agendamento():
                     'telefone_informado': telefone
                 }), 400
             
-            logger.info(f"Criando agendamento para novo paciente: {nome_paciente} (telefone: {telefone})")
+            logger.info(f"📝 Criando agendamento para novo paciente: '{nome_paciente}' (telefone: {telefone})")
+            # Log detalhado do nome do paciente para depuração
+            logger.debug(f"Detalhes do paciente - Nome: '{nome_paciente}', Telefone: {telefone}, Caracteres no nome: {len(nome_paciente)}")
         
         # Converte data
         try:
@@ -295,15 +298,50 @@ def criar_agendamento():
             nome_paciente=nome_paciente
         )
         
+        # Log do resultado completo do agendamento
+        logger.info(f"Resultado do agendamento: {resultado}")
+        
         if resultado.get('sucesso'):
             return jsonify(resultado), 201
         else:
             return jsonify(resultado), 400
         
     except Exception as e:
-        logger.error(f"Erro ao criar agendamento: {e}")
+        logger.error(f"❌ ERRO ao criar agendamento: {e}")
+        # Log detalhado do erro com traceback
+        import traceback
+        logger.error(f"Traceback do erro: {traceback.format_exc()}")
         return jsonify({'erro': str(e)}), 500
 
+
+def _extrair_nome_completo(mensagem: str) -> str:
+    """
+    Extrai o nome completo de uma mensagem como "meu nome é Gustavo Prezzoti"
+    
+    Args:
+        mensagem: Mensagem do cliente
+        
+    Returns:
+        Nome completo extraído ou string vazia
+    """
+    import re
+    
+    # Padrões comuns para extração de nome
+    padroes = [
+        r'(?:me\s+chamo|meu\s+nome\s+[ée]|sou\s+(?:o|a)?)\s*[\s:]+([A-Za-zÀ-ÖØ-öø-ÿ\s]+)',  # "me chamo João Silva", "meu nome é Maria Santos"
+        r'(?:nome|nome\s+completo)\s*[\s:]+([A-Za-zÀ-ÖØ-öø-ÿ\s]+)',  # "nome: Pedro Souza", "nome completo: Ana Lima"
+        r'([A-Za-zÀ-ÖØ-öø-ÿ]{2,}\s+[A-Za-zÀ-ÖØ-öø-ÿ]{2,}(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ]{2,})*)' # "João Silva", "Maria Santos Lima"
+    ]
+    
+    for padrao in padroes:
+        match = re.search(padrao, mensagem, re.IGNORECASE)
+        if match:
+            nome_extraido = match.group(1).strip()
+            # Remove pontuação no final
+            nome_extraido = re.sub(r'[.,!?;:]$', '', nome_extraido)
+            return nome_extraido
+    
+    return ""
 
 def _buscar_nome_paciente_por_telefone(telefone: str) -> str:
     """
@@ -339,7 +377,7 @@ def _buscar_nome_paciente_por_telefone(telefone: str) -> str:
                 # content contém o nome, ou busca do metadata
                 nome = result[0] or (result[1].get('nome', '') if result[1] else '')
                 if nome:
-                    logger.info(f"Nome do paciente encontrado para telefone {telefone}: {nome}")
+                    logger.info(f"Nome do paciente encontrado para telefone {telefone}: '{nome}'")
                     return nome
             
             logger.warning(f"Nome do paciente nao encontrado para telefone: {telefone}")
@@ -391,6 +429,7 @@ def salvar_nome_paciente():
     Body JSON:
         telefone: Telefone do paciente (obrigatório)
         nome: Nome completo do paciente (obrigatório)
+        mensagem: Mensagem original (opcional - para extrair nome completo)
     """
     try:
         dados = request.get_json()
@@ -400,13 +439,19 @@ def salvar_nome_paciente():
         
         telefone = dados.get('telefone', '').strip()
         nome = dados.get('nome', '').strip()
+        mensagem = dados.get('mensagem', '').strip()
         
         if not telefone:
             return jsonify({'erro': 'Campo "telefone" e obrigatorio'}), 400
         if not nome:
             return jsonify({'erro': 'Campo "nome" e obrigatorio'}), 400
         
-        # Salva no banco usando a tabela documents
+        if mensagem and len(nome.split()) == 1:
+            nome_extraido = _extrair_nome_completo(mensagem)
+            if nome_extraido and len(nome_extraido.split()) > 1:
+                logger.info(f"Nome completo extraído da mensagem: '{nome_extraido}' (original: '{nome}')")
+                nome = nome_extraido
+        
         from app.database import get_db
         db = get_db()
         
