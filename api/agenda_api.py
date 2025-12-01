@@ -683,129 +683,49 @@ class AgendaAPI:
             # Calcula AtomicDate (YYYYMMDD)
             atomic_date = int(data.strftime('%Y%m%d'))
             
-            # Determina se é um novo paciente ou paciente existente
-            is_new_patient = not paciente_id or paciente_id == "" or paciente_id == "None"
-            
-            # Se não tem paciente_id mas tem telefone, tenta buscar paciente existente
-            if is_new_patient and telefone:
-                logger.info(f"Buscando paciente existente pelo telefone: {telefone}")
-                paciente_existente = self.buscar_paciente_por_telefone(telefone)
-                
-                if paciente_existente and paciente_existente.get('id'):
-                    paciente_id = str(paciente_existente['id'])
-                    is_new_patient = False
-                    logger.info(f"✅ Paciente encontrado no Clinicorp: {paciente_existente.get('nome')} (ID: {paciente_id})")
-            
-            # Prepara dados do agendamento
-            agendamento_data = {
-                "Dentist_PersonId": int(profissional_id),
-                "date": data_iso,
-                "referenceMonth": "",
                 "fromTime": hora_inicio,
                 "toTime": hora_fim,
-                "Notes": observacoes,
-                "Procedures": ", ".join(procedimentos) if procedimentos else "",
-                "wasEdited": "",
-                "SelectedProceduresList": procedimentos or [],
-                "SubAppointments": [{
-                    "ScheduleToType": "PROFESSIONAL",
-                    "fromTime": hora_inicio,
-                    "toTime": hora_fim,
-                    "ScheduleToId": int(profissional_id),
-                    "Name": "",
-                    "Color": "",
-                    "Dentist_PersonId": int(profissional_id)
-                }],
-                "ScheduleToType": "PROFESSIONAL",
                 "ScheduleToId": int(profissional_id),
-                "AtomicDate": atomic_date,
-                "Clinic_BusinessId": int(clinic_id),
-                "AddInfo": {"AddInfo1": "Confirmation,"},
-                "AlertInfo": {
-                    "ConfirmSchedule": "1D",
-                    "AlertSchedule": "0H",
-                    "ConfirmWhats": "",
-                    "ConfirmSms": "X",
-                    "AlertWhats": "",
-                    "AlertSms": "",
-                    "AlertCliniMe": "",
-                    "ConfirmCliniMe": ""
-                },
-                "Email": email,
-                "MobilePhone": telefone,
-                "CreateUserId": self._obter_user_id(),
-                "ToTestDate": data_iso,
-                "ProceduresDuration": 0,
-                "CreatedBy": "WEB",
-                "_AccessPath": "*.Calendar.Appointment.Create"
-            }
-            
-            if is_new_patient:
-                # Novo paciente - API do Clinicorp cria automaticamente
-                if not nome_paciente:
-                    return {
-                        'sucesso': False,
-                        'erro': 'Nome do paciente é obrigatório para criar novo paciente'
-                    }
-                if not telefone:
-                    return {
-                        'sucesso': False,
-                        'erro': 'Telefone é obrigatório para criar novo paciente'
-                    }
-                
-                agendamento_data["isNew"] = "X"
-                agendamento_data["Name"] = nome_paciente
-                logger.info(f"Criando agendamento com NOVO PACIENTE '{nome_paciente}' (telefone: {telefone}) com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
-            else:
-                # Paciente existente
-                agendamento_data["Patient_PersonId"] = int(paciente_id)
-                logger.info(f"Criando agendamento para paciente existente {paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
-            
-            logger.debug(f"Payload do agendamento: {agendamento_data}")
-            
-            response = self.client.post(
-                endpoint,
-                use_api_url=True,
-                json=agendamento_data,
-                headers={
-                    'Content-Type': 'application/json;charset=UTF-8'
-                }
-            )
-            
-            if response.status_code == 200:
-                try:
-                    resultado = response.json()
-                    patient_id_criado = resultado.get('Patient_PersonId')
-                    patient_name = resultado.get('PatientName') or resultado.get('Name')
-                    
-                    if is_new_patient and patient_id_criado:
-                        logger.info(f"✅ Agendamento criado com sucesso! Novo paciente criado: {patient_name} (ID: {patient_id_criado})")
-                    else:
-                        logger.info("✅ Agendamento criado com sucesso")
-                    
-                    return {
-                        'sucesso': True,
-                        'dados': resultado,
-                        'paciente_criado': is_new_patient,
-                        'paciente_id': patient_id_criado
-                    }
-                except:
-                    logger.info("✅ Agendamento criado com sucesso (resposta não JSON)")
-                    return {
-                        'sucesso': True,
-                        'dados': response.text
-                    }
-            else:
-                logger.error(f"Erro ao criar agendamento: {response.status_code} - {response.text}")
+                "Name": "",
+                "Color": "",
+                "Dentist_PersonId": int(profissional_id)
+            }],
+            "ScheduleToType": "PROFESSIONAL",
+            "ScheduleToId": int(profissional_id),
+            "AtomicDate": atomic_date,
+            "Clinic_BusinessId": int(clinic_id),
+            "AddInfo": {"AddInfo1": "Confirmation,"},
+            "AlertInfo": {
+                "ConfirmSchedule": "1D",
+                "AlertSchedule": "0H",
+                "ConfirmWhats": "",
+                "ConfirmSms": "X",
+                "AlertWhats": "",
+                "AlertSms": "",
+                "AlertCliniMe": "",
+                "ConfirmCliniMe": ""
+            },
+            "Email": email,
+            "MobilePhone": telefone,
+            "CreateUserId": self._obter_user_id(),
+            "ToTestDate": data_iso,
+            "ProceduresDuration": 0,
+            "CreatedBy": "WEB",
+            "_AccessPath": "*.Calendar.Appointment.Create"
+        }
+        
+        if is_new_patient:
+            # Novo paciente - API do Clinicorp cria automaticamente
+            if not nome_paciente:
                 return {
                     'sucesso': False,
                     'erro': f"Status {response.status_code}: {response.text}"
                 }
                 
         except Exception as e:
-            logger.error(f"Erro ao criar agendamento: {e}")
+            logger.error(f"❌ Erro ao criar agendamento: {e}")
             import traceback
-            logger.debug(traceback.format_exc())
+            logger.error(f"Traceback completo do erro: {traceback.format_exc()}")
             return {
                 'sucesso': False,
                 'erro': str(e)
