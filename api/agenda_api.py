@@ -899,3 +899,63 @@ class AgendaAPI:
                 'erro': str(e)
             }
 
+    def deletar_agendamento(self, agendamento_id: str) -> Dict:
+        """Deleta (cancela) um agendamento no Clinicorp pelo ID.
+
+        Args:
+            agendamento_id: ID do agendamento no Clinicorp (campo id retornado na criação).
+
+        Returns:
+            Dicionário com resultado da deleção.
+        """
+        try:
+            if not agendamento_id:
+                return {
+                    'sucesso': False,
+                    'erro': 'agendamento_id é obrigatório'
+                }
+
+            endpoint = '/solution/api/appointment/delete'
+
+            params = {
+                'id': agendamento_id,
+                '_AccessPath': '*.Appointment.Delete',
+                '__caller': 'InfoPanel.render.onClick_delete_appointment'
+            }
+
+            logger.info(f"🗑️ Deletando agendamento no Clinicorp: ID {agendamento_id}")
+
+            response = self.client.get(
+                endpoint,
+                use_api_url=True,
+                params=params
+            )
+
+            if response.status_code == 200:
+                try:
+                    dados = response.json()
+                except Exception:
+                    dados = response.text
+
+                logger.info(f"✅ Agendamento {agendamento_id} deletado com sucesso no Clinicorp")
+                return {
+                    'sucesso': True,
+                    'dados': dados,
+                    'id': agendamento_id
+                }
+            else:
+                logger.error(f"Erro ao deletar agendamento {agendamento_id}: {response.status_code} - {response.text}")
+                return {
+                    'sucesso': False,
+                    'erro': f'Status {response.status_code}: {response.text}'
+                }
+
+        except Exception as e:
+            logger.error(f"Erro ao deletar agendamento {agendamento_id}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return {
+                'sucesso': False,
+                'erro': str(e)
+            }
+

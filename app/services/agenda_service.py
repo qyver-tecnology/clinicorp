@@ -1133,3 +1133,21 @@ class AgendaService:
             logger.error(f"Erro ao buscar agendamentos por telefone: {e}")
             return []
 
+    def deletar_agendamento(self, agendamento_id: str) -> Dict:
+        """Deleta (cancela) um agendamento no Clinicorp.
+
+        Args:
+            agendamento_id: ID do agendamento no Clinicorp.
+
+        Returns:
+            Dicionário com resultado da deleção.
+        """
+        try:
+            return self.agenda_api.deletar_agendamento(agendamento_id)
+        except Exception as e:
+            logger.error(f"Erro ao deletar agendamento {agendamento_id}: {e}")
+            return {
+                'sucesso': False,
+                'erro': str(e)
+            }
+

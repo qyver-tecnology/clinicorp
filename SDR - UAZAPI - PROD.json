@@ -620,6 +620,46 @@
     },
     {
       "parameters": {
+        "toolDescription": "Cancela (deleta) um agendamento existente no Clinicorp.\n\nUSE ESTA FERRAMENTA APENAS APÓS CONFIRMAR COM O CLIENTE QUE ELE DESEJA CANCELAR O HORÁRIO.\n\nParâmetros OBRIGATÓRIOS:\n- id: ID do agendamento no Clinicorp (campo id retornado pela API de criação ou pelas ferramentas de busca de agendamentos).\n\nCOMO USAR:\n1. Confirme com o cliente qual agendamento deseja cancelar (data, hora, profissional).\n2. Use uma ferramenta de busca de agendamentos (ex: Buscar_eventos_agenda ou Buscar_agendamentos_paciente) para obter o ID exato.\n3. Chame esta ferramenta passando o id correto.\n4. Se sucesso=true, avise o cliente que o agendamento foi cancelado.",
+        "method": "POST",
+        "url": "http://72.60.137.139:5000/api/agenda/deletar",
+        "sendHeaders": true,
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            },
+            {
+              "name": "Content-Type"
+            },
+            {
+              "name": "ngrok-skip-browser-warning"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"id\": \"{id}\"}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "id",
+              "description": "ID do agendamento no Clinicorp a ser cancelado"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -496
+      ],
+      "id": "cancelar-agendamento-clinicorp-tool",
+      "name": "Cancelar_agendamento_clinicorp"
+    },
+    {
+      "parameters": {
         "toolDescription": "Força uma sincronização manual da agenda com o Clinicorp. Use quando precisar atualizar os dados da agenda ou quando os dados parecerem desatualizados.",
         "method": "POST",
         "url": "http://72.60.137.139:5000/api/agenda/sync",
@@ -914,6 +954,17 @@
           {
             "node": "Extrair Dados",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar_agendamento_clinicorp": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Lis",
+            "type": "ai_tool",
             "index": 0
           }
         ]

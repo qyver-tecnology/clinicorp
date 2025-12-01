@@ -326,6 +326,33 @@ def criar_agendamento():
         return jsonify({'erro': str(e)}), 500
 
 
+@api_bp.route('/agenda/deletar', methods=['POST'])
+def deletar_agendamento():
+    """Deleta (cancela) um agendamento no Clinicorp.
+
+    Body JSON:
+        id: ID do agendamento no Clinicorp (obrigatório)
+    """
+    try:
+        dados = request.get_json() or {}
+
+        agendamento_id = str(dados.get('id') or '').strip()
+
+        if not agendamento_id:
+            return jsonify({'erro': 'Campo "id" (ID do agendamento no Clinicorp) é obrigatorio'}), 400
+
+        logger.info(f"🗑️ Solicitando deleção de agendamento ID {agendamento_id} no Clinicorp")
+
+        resultado = agenda_service.deletar_agendamento(agendamento_id)
+
+        status_code = 200 if resultado.get('sucesso') else 400
+        return jsonify(resultado), status_code
+
+    except Exception as e:
+        logger.error(f"Erro ao deletar agendamento: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
 def _extrair_nome_completo(mensagem: str) -> str:
     """
     Extrai o nome completo de uma mensagem como "meu nome é Gustavo Prezzoti"
