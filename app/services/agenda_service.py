@@ -827,10 +827,7 @@ class AgendaService:
             Dicionário com resultado do agendamento
         """
         try:
-            logger.info(f"🔄 Iniciando criação de agendamento no serviço - Paciente: '{nome_paciente}' (ID: {paciente_id}), Profissional: {profissional_id}")
-            logger.debug(f"Detalhes do agendamento: Data={data.strftime('%Y-%m-%d')}, Horário={hora_inicio}-{hora_fim}, Telefone={telefone}")
-            
-            resultado = self.agenda_api.criar_agendamento(
+            return self.agenda_api.criar_agendamento(
                 paciente_id=paciente_id,
                 profissional_id=profissional_id,
                 data=data,
@@ -842,19 +839,8 @@ class AgendaService:
                 email=email,
                 nome_paciente=nome_paciente
             )
-            
-            if resultado.get('sucesso'):
-                logger.info(f"✅ Agendamento criado com sucesso no serviço - Paciente: '{nome_paciente}' (ID: {paciente_id or resultado.get('paciente_id')})")
-                logger.debug(f"Resultado completo do agendamento: {resultado}")
-            else:
-                logger.warning(f"⚠️ Falha ao criar agendamento no serviço - Erro: {resultado.get('erro')}")
-                
-            return resultado
-            
         except Exception as e:
-            logger.error(f"❌ ERRO ao criar agendamento no serviço: {e}")
-            import traceback
-            logger.error(f"Traceback completo: {traceback.format_exc()}")
+            logger.error(f"Erro ao criar agendamento: {e}")
             return {
                 'sucesso': False,
                 'erro': str(e)

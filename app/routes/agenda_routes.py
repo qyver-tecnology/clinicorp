@@ -250,7 +250,6 @@ def criar_agendamento():
         
         # Se não tem paciente_id, precisa de telefone e nome para criar novo paciente
         if not paciente_id:
-            logger.info(f"Paciente ID não fornecido, verificando telefone para criar novo paciente")
             if not telefone:
                 return jsonify({
                     'erro': 'Campo "telefone" e obrigatorio quando paciente_id nao e fornecido',
@@ -268,9 +267,7 @@ def criar_agendamento():
                     'telefone_informado': telefone
                 }), 400
             
-            logger.info(f"📝 Criando agendamento para novo paciente: '{nome_paciente}' (telefone: {telefone})")
-            # Log detalhado do nome do paciente para depuração
-            logger.debug(f"Detalhes do paciente - Nome: '{nome_paciente}', Telefone: {telefone}, Caracteres no nome: {len(nome_paciente)}")
+            logger.info(f"Criando agendamento para novo paciente: {nome_paciente} (telefone: {telefone})")
         
         # Converte data
         try:
@@ -298,19 +295,13 @@ def criar_agendamento():
             nome_paciente=nome_paciente
         )
         
-        # Log do resultado completo do agendamento
-        logger.info(f"Resultado do agendamento: {resultado}")
-        
         if resultado.get('sucesso'):
             return jsonify(resultado), 201
         else:
             return jsonify(resultado), 400
         
     except Exception as e:
-        logger.error(f"❌ ERRO ao criar agendamento: {e}")
-        # Log detalhado do erro com traceback
-        import traceback
-        logger.error(f"Traceback do erro: {traceback.format_exc()}")
+        logger.error(f"Erro ao criar agendamento: {e}")
         return jsonify({'erro': str(e)}), 500
 
 
@@ -377,7 +368,7 @@ def _buscar_nome_paciente_por_telefone(telefone: str) -> str:
                 # content contém o nome, ou busca do metadata
                 nome = result[0] or (result[1].get('nome', '') if result[1] else '')
                 if nome:
-                    logger.info(f"Nome do paciente encontrado para telefone {telefone}: '{nome}'")
+                    logger.info(f"Nome do paciente encontrado para telefone {telefone}: {nome}")
                     return nome
             
             logger.warning(f"Nome do paciente nao encontrado para telefone: {telefone}")
