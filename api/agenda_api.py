@@ -626,7 +626,19 @@ class AgendaAPI:
             if response.status_code == 200:
                 try:
                     resultado = response.json()
-                    paciente_id = resultado.get('id')
+                    
+                    # Tenta extrair o ID de diferentes estruturas de resposta
+                    paciente_id = None
+                    
+                    # Estrutura 1: resultado.id (resposta simples)
+                    if resultado.get('id'):
+                        paciente_id = resultado.get('id')
+                    # Estrutura 2: resultado.patient.Patient.id (resposta Clinicorp)
+                    elif resultado.get('patient', {}).get('Patient', {}).get('id'):
+                        paciente_id = resultado['patient']['Patient']['id']
+                    # Estrutura 3: resultado.Patient.id
+                    elif resultado.get('Patient', {}).get('id'):
+                        paciente_id = resultado['Patient']['id']
                     
                     if paciente_id:
                         logger.info(f"✅ Paciente criado com sucesso no Clinicorp: {nome} (ID: {paciente_id})")
