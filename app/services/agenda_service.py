@@ -992,7 +992,6 @@ class AgendaService:
             # Tenta registrar o agendamento também no banco local (tabela agendamentos)
             try:
                 from app.database import get_db
-import json
                 db = get_db()
 
                 if not db.is_connected():
