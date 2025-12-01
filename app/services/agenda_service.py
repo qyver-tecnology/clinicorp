@@ -1089,7 +1089,7 @@ class AgendaService:
                     tz_brasil = pytz.timezone('America/Sao_Paulo')
                     agora = datetime.now(tz_brasil)
                     
-                    # Busca agendamentos futuros do paciente
+                    # Busca todos os agendamentos do paciente (passados e futuros)
                     query = text("""
                         SELECT 
                             id,
@@ -1102,9 +1102,8 @@ class AgendaService:
                             metadata
                         FROM agendamentos
                         WHERE metadata->>'telefone' = :telefone
-                        AND data_agendamento >= CURRENT_DATE
-                        ORDER BY data_agendamento ASC, hora_inicio ASC
-                        LIMIT 5
+                        ORDER BY data_agendamento DESC, hora_inicio DESC
+                        LIMIT 10
                     """)
                     
                     results = session.execute(query, {'telefone': telefone}).fetchall()
