@@ -970,7 +970,8 @@ class AgendaService:
             Dicionário com resultado do agendamento
         """
         try:
-            return self.agenda_api.criar_agendamento(
+            # Primeiro cria o agendamento no Clinicorp
+            resultado = self.agenda_api.criar_agendamento(
                 paciente_id=paciente_id,
                 profissional_id=profissional_id,
                 data=data,
@@ -982,6 +983,75 @@ class AgendaService:
                 email=email,
                 nome_paciente=nome_paciente
             )
+
+            # Se falhou na API externa, simplesmente retorna o erro
+            if not resultado.get('sucesso'):
+                return resultado
+
+            # Tenta registrar o agendamento também no banco local (tabela agendamentos)
+            try:
+                from app.database import get_db
+                db = get_db()
+
+                if not db.is_connected():
+                    logger.warning("Banco de dados não conectado. Agendamento não será salvo localmente.")
+                    return resultado
+
+                with db.get_session() as session:
+                    from sqlalchemy import text
+
+                    data_agendamento = data.date()
+                    profissional_nome = None
+                    procedimento_nome = ", ".join(procedimentos) if procedimentos else None
+                    status = 'confirmado'
+
+                    metadata = {
+                        'telefone': telefone,
+                        'paciente_id': paciente_id,
+                        'email': email,
+                        'nome_paciente': nome_paciente
+                    }
+
+                    insert_query = text("""
+                        INSERT INTO agendamentos (
+                            data_agendamento,
+                            hora_inicio,
+                            hora_fim,
+                            profissional_nome,
+                            procedimento,
+                            status,
+                            metadata
+                        )
+                        VALUES (
+                            :data_agendamento,
+                            :hora_inicio,
+                            :hora_fim,
+                            :profissional_nome,
+                            :procedimento,
+                            :status,
+                            :metadata
+                        )
+                    """)
+
+                    session.execute(insert_query, {
+                        'data_agendamento': data_agendamento,
+                        'hora_inicio': hora_inicio,
+                        'hora_fim': hora_fim,
+                        'profissional_nome': profissional_nome,
+                        'procedimento': procedimento_nome,
+                        'status': status,
+                        'metadata': metadata
+                    })
+
+                    session.commit()
+                    logger.info(f"✅ Agendamento salvo no banco local para telefone {telefone} em {data_agendamento} {hora_inicio}-{hora_fim}")
+
+            except Exception as e:
+                # Não quebra o fluxo se o save local falhar, apenas loga o erro
+                logger.error(f"Erro ao salvar agendamento no banco local: {e}")
+
+            return resultado
+
         except Exception as e:
             logger.error(f"Erro ao criar agendamento: {e}")
             return {
