@@ -891,11 +891,11 @@ class AgendaService:
                                 jsonb_set(
                                     jsonb_set(
                                         COALESCE(metadata, '{}'::jsonb),
-                                        '{nome}', to_jsonb(:nome_val)
+                                        '{nome}', to_jsonb(CAST(:nome_val AS text))
                                     ),
-                                    '{paciente_id}', to_jsonb(:paciente_id_val)
+                                    '{paciente_id}', to_jsonb(CAST(:paciente_id_val AS text))
                                 ),
-                                '{email}', to_jsonb(:email_val)
+                                '{email}', to_jsonb(CAST(:email_val AS text))
                             )
                         WHERE id = :doc_id
                     """)

@@ -556,7 +556,7 @@ def salvar_nome_paciente():
                             metadata = jsonb_set(
                                 COALESCE(metadata, '{}'::jsonb),
                                 '{nome}',
-                                to_jsonb(:nome_valor)
+                                to_jsonb(CAST(:nome_valor AS text))
                             ),
                             created_at = COALESCE(created_at, CURRENT_TIMESTAMP)
                         WHERE id = :doc_id
