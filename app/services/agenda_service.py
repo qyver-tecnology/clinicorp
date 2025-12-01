@@ -8,6 +8,7 @@ import pytz
 from sqlalchemy import func
 from app.database import get_db, AgendaEvent, SyncHistory, Profissional
 from api.agenda_api import AgendaAPI
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -991,6 +992,7 @@ class AgendaService:
             # Tenta registrar o agendamento também no banco local (tabela agendamentos)
             try:
                 from app.database import get_db
+import json
                 db = get_db()
 
                 if not db.is_connected():
@@ -1029,7 +1031,7 @@ class AgendaService:
                             :profissional_nome,
                             :procedimento,
                             :status,
-                            :metadata
+                            CAST(:metadata AS jsonb)
                         )
                     """)
 
@@ -1040,7 +1042,7 @@ class AgendaService:
                         'profissional_nome': profissional_nome,
                         'procedimento': procedimento_nome,
                         'status': status,
-                        'metadata': metadata
+                        'metadata': json.dumps(metadata)
                     })
 
                     session.commit()
