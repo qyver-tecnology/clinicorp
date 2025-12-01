@@ -792,6 +792,148 @@ class AgendaService:
             logger.error(f"Erro ao buscar paciente por telefone: {e}")
             return None
     
+    def criar_paciente(self, nome: str, telefone: str, email: str = "") -> Optional[Dict]:
+        """
+        Cria um novo paciente no Clinicorp e salva no banco local
+        
+        Args:
+            nome: Nome completo do paciente
+            telefone: Telefone do paciente
+            email: Email do paciente (opcional)
+            
+        Returns:
+            Dados do paciente criado ou None se falhar
+        """
+        try:
+            # Cria no Clinicorp
+            paciente = self.agenda_api.criar_paciente(nome=nome, telefone=telefone, email=email)
+            
+            if paciente and paciente.get('id'):
+                # Salva também no banco local
+                self._salvar_paciente_no_banco_local(
+                    paciente_id=str(paciente['id']),
+                    nome=nome,
+                    telefone=telefone,
+                    email=email
+                )
+                return paciente
+            
+            return None
+        except Exception as e:
+            logger.error(f"Erro ao criar paciente: {e}")
+            return None
+    
+    def buscar_ou_criar_paciente(self, nome: str, telefone: str, email: str = "") -> Optional[Dict]:
+        """
+        Busca paciente pelo telefone. Se não existir, cria um novo no Clinicorp e no banco local.
+        
+        Args:
+            nome: Nome completo do paciente
+            telefone: Telefone do paciente
+            email: Email do paciente (opcional)
+            
+        Returns:
+            Dados do paciente (existente ou recém-criado) ou None se falhar
+        """
+        try:
+            # Primeiro busca no Clinicorp
+            paciente = self.agenda_api.buscar_ou_criar_paciente(nome=nome, telefone=telefone, email=email)
+            
+            if paciente and paciente.get('id'):
+                # Salva/atualiza no banco local
+                self._salvar_paciente_no_banco_local(
+                    paciente_id=str(paciente['id']),
+                    nome=paciente.get('nome', nome),
+                    telefone=telefone,
+                    email=email
+                )
+                return paciente
+            
+            return None
+        except Exception as e:
+            logger.error(f"Erro ao buscar ou criar paciente: {e}")
+            return None
+    
+    def _salvar_paciente_no_banco_local(self, paciente_id: str, nome: str, telefone: str, email: str = ""):
+        """
+        Salva ou atualiza paciente no banco de dados local
+        
+        Args:
+            paciente_id: ID do paciente no Clinicorp
+            nome: Nome do paciente
+            telefone: Telefone do paciente
+            email: Email do paciente
+        """
+        db = get_db()
+        if not db.is_connected():
+            logger.warning("Banco de dados não conectado. Paciente não será salvo localmente.")
+            return
+        
+        try:
+            with db.get_session() as session:
+                from sqlalchemy import text
+                
+                # Verifica se já existe
+                query = text("""
+                    SELECT id FROM documents 
+                    WHERE metadata->>'telefone' = :telefone 
+                    AND metadata->>'tipo' = 'paciente_info'
+                    LIMIT 1
+                """)
+                result = session.execute(query, {'telefone': telefone}).fetchone()
+                
+                if result:
+                    # Atualiza existente
+                    update_query = text("""
+                        UPDATE documents 
+                        SET content = :nome,
+                            metadata = jsonb_set(
+                                jsonb_set(
+                                    jsonb_set(
+                                        COALESCE(metadata, '{}'::jsonb),
+                                        '{nome}', to_jsonb(:nome::text)
+                                    ),
+                                    '{paciente_id}', to_jsonb(:paciente_id::text)
+                                ),
+                                '{email}', to_jsonb(:email::text)
+                            )
+                        WHERE id = :doc_id
+                    """)
+                    session.execute(update_query, {
+                        'nome': nome,
+                        'paciente_id': paciente_id,
+                        'email': email,
+                        'doc_id': result[0]
+                    })
+                    logger.info(f"✅ Paciente atualizado no banco local: {nome} (ID Clinicorp: {paciente_id})")
+                else:
+                    # Cria novo
+                    insert_query = text("""
+                        INSERT INTO documents (content, metadata)
+                        VALUES (
+                            :nome,
+                            jsonb_build_object(
+                                'telefone', :telefone,
+                                'nome', :nome,
+                                'paciente_id', :paciente_id,
+                                'email', :email,
+                                'tipo', 'paciente_info'
+                            )
+                        )
+                    """)
+                    session.execute(insert_query, {
+                        'nome': nome,
+                        'telefone': telefone,
+                        'paciente_id': paciente_id,
+                        'email': email
+                    })
+                    logger.info(f"✅ Paciente salvo no banco local: {nome} (ID Clinicorp: {paciente_id})")
+                
+                session.commit()
+                
+        except Exception as e:
+            logger.error(f"Erro ao salvar paciente no banco local: {e}")
+    
     def criar_agendamento(
         self,
         paciente_id: Optional[str],

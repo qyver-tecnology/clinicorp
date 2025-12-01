@@ -248,7 +248,7 @@ def criar_agendamento():
         if not hora_fim:
             return jsonify({'erro': 'Campo "hora_fim" e obrigatorio (formato: HH:MM)'}), 400
         
-        # Se não tem paciente_id, precisa de telefone e nome para criar novo paciente
+        # Se não tem paciente_id, precisa de telefone para buscar/criar paciente
         if not paciente_id:
             if not telefone:
                 return jsonify({
@@ -267,7 +267,28 @@ def criar_agendamento():
                     'telefone_informado': telefone
                 }), 400
             
-            logger.info(f"Criando agendamento para novo paciente: {nome_paciente} (telefone: {telefone})")
+            # PASSO 1: Buscar ou criar paciente no Clinicorp (e salvar no banco local)
+            logger.info(f"🔍 Buscando/criando paciente no Clinicorp: {nome_paciente} ({telefone})")
+            paciente = agenda_service.buscar_ou_criar_paciente(
+                nome=nome_paciente,
+                telefone=telefone,
+                email=dados.get('email', '')
+            )
+            
+            if not paciente or not paciente.get('id'):
+                return jsonify({
+                    'erro': 'Falha ao criar paciente no Clinicorp',
+                    'detalhes': 'Nao foi possivel criar o paciente no sistema. Tente novamente.',
+                    'nome': nome_paciente,
+                    'telefone': telefone
+                }), 400
+            
+            # Usa o ID do paciente do Clinicorp
+            paciente_id = str(paciente['id'])
+            logger.info(f"✅ Paciente pronto para agendamento: {paciente.get('nome')} (ID: {paciente_id})")
+        
+        # PASSO 2: Criar agendamento (agora sempre com paciente_id válido)
+        logger.info(f"📅 Criando agendamento para paciente ID: {paciente_id}")
         
         # Converte data
         try:
@@ -409,6 +430,63 @@ def buscar_paciente_clinicorp():
             
     except Exception as e:
         logger.error(f"Erro ao buscar paciente no Clinicorp: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@api_bp.route('/paciente/criar', methods=['POST'])
+def criar_paciente():
+    """
+    Cria um novo paciente no Clinicorp e salva no banco local.
+    Se o paciente já existir (pelo telefone), retorna os dados dele.
+    
+    Body JSON:
+        telefone: Telefone do paciente (obrigatório)
+        nome: Nome completo do paciente (obrigatório)
+        email: Email do paciente (opcional)
+    
+    Returns:
+        Dados do paciente (existente ou recém-criado)
+    """
+    try:
+        dados = request.get_json()
+        
+        if not dados:
+            return jsonify({'erro': 'Body JSON e obrigatorio'}), 400
+        
+        telefone = dados.get('telefone', '').strip()
+        nome = dados.get('nome', '').strip()
+        email = dados.get('email', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Campo "telefone" e obrigatorio'}), 400
+        if not nome:
+            return jsonify({'erro': 'Campo "nome" e obrigatorio'}), 400
+        
+        logger.info(f"🔍 Buscando/criando paciente: {nome} ({telefone})")
+        
+        # Busca ou cria paciente no Clinicorp (e salva no banco local)
+        paciente = agenda_service.buscar_ou_criar_paciente(
+            nome=nome,
+            telefone=telefone,
+            email=email
+        )
+        
+        if paciente and paciente.get('id'):
+            return jsonify({
+                'sucesso': True,
+                'paciente': paciente,
+                'mensagem': 'Paciente pronto para agendamento'
+            }), 200
+        else:
+            return jsonify({
+                'sucesso': False,
+                'erro': 'Falha ao criar paciente no Clinicorp',
+                'nome': nome,
+                'telefone': telefone
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Erro ao criar paciente: {e}")
         return jsonify({'erro': str(e)}), 500
 
 

@@ -577,6 +577,113 @@ class AgendaAPI:
             logger.debug(traceback.format_exc())
             return None
     
+    def criar_paciente(self, nome: str, telefone: str, email: str = "") -> Optional[Dict]:
+        """
+        Cria um novo paciente na API do Clinicorp
+        
+        Args:
+            nome: Nome completo do paciente
+            telefone: Telefone do paciente
+            email: Email do paciente (opcional)
+            
+        Returns:
+            Dados do paciente criado ou None se falhar
+        """
+        try:
+            if not nome or not telefone:
+                logger.error("Nome e telefone são obrigatórios para criar paciente")
+                return None
+            
+            # Limpa o telefone
+            telefone_limpo = ''.join(filter(str.isdigit, telefone))
+            
+            clinic_id = self._obter_clinic_id()
+            endpoint = '/solution/api/patient/create'
+            
+            # Dados do paciente para criação
+            paciente_data = {
+                "Name": nome.strip(),
+                "MobilePhone": telefone_limpo,
+                "Email": email.strip() if email else "",
+                "Clinic_BusinessId": int(clinic_id),
+                "Type": "PATIENT",
+                "Active": "X",
+                "_AccessPath": "*.Patient.Create"
+            }
+            
+            logger.info(f"📝 Criando paciente no Clinicorp: {nome} (telefone: {telefone_limpo})")
+            logger.debug(f"Payload: {paciente_data}")
+            
+            response = self.client.post(
+                endpoint,
+                use_api_url=True,
+                json=paciente_data,
+                headers={
+                    'Content-Type': 'application/json;charset=UTF-8'
+                }
+            )
+            
+            if response.status_code == 200:
+                try:
+                    resultado = response.json()
+                    paciente_id = resultado.get('id')
+                    
+                    if paciente_id:
+                        logger.info(f"✅ Paciente criado com sucesso no Clinicorp: {nome} (ID: {paciente_id})")
+                        return {
+                            'id': paciente_id,
+                            'nome': nome,
+                            'telefone': telefone_limpo,
+                            'email': email,
+                            'dados_originais': resultado
+                        }
+                    else:
+                        logger.error(f"Resposta da API não contém ID do paciente: {resultado}")
+                        return None
+                        
+                except Exception as e:
+                    logger.error(f"Erro ao processar resposta de criação de paciente: {e}")
+                    return None
+            else:
+                logger.error(f"Erro ao criar paciente: Status {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Erro ao criar paciente: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+            return None
+    
+    def buscar_ou_criar_paciente(self, nome: str, telefone: str, email: str = "") -> Optional[Dict]:
+        """
+        Busca paciente pelo telefone. Se não existir, cria um novo.
+        
+        Args:
+            nome: Nome completo do paciente
+            telefone: Telefone do paciente
+            email: Email do paciente (opcional)
+            
+        Returns:
+            Dados do paciente (existente ou recém-criado) ou None se falhar
+        """
+        # Primeiro, busca paciente existente
+        logger.info(f"🔍 Buscando paciente no Clinicorp pelo telefone: {telefone}")
+        paciente = self.buscar_paciente_por_telefone(telefone)
+        
+        if paciente and paciente.get('id'):
+            logger.info(f"✅ Paciente já existe no Clinicorp: {paciente.get('nome')} (ID: {paciente.get('id')})")
+            return paciente
+        
+        # Não existe, cria novo
+        logger.info(f"📝 Paciente não encontrado, criando novo: {nome}")
+        paciente_criado = self.criar_paciente(nome=nome, telefone=telefone, email=email)
+        
+        if paciente_criado:
+            return paciente_criado
+        
+        logger.error(f"❌ Falha ao criar paciente: {nome} ({telefone})")
+        return None
+
     def buscar_paciente_por_nome(self, nome: str) -> List[Dict]:
         """
         Busca pacientes na API do Clinicorp pelo nome
@@ -641,7 +748,7 @@ class AgendaAPI:
 
     def criar_agendamento(
         self,
-        paciente_id: Optional[str],
+        paciente_id: str,
         profissional_id: str,
         data: datetime,
         hora_inicio: str,
@@ -653,27 +760,34 @@ class AgendaAPI:
         nome_paciente: str = ""
     ) -> Dict:
         """
-        Cria um novo agendamento no Clinicorp
+        Cria um novo agendamento no Clinicorp.
         
-        Se paciente_id não for fornecido mas nome_paciente e telefone forem,
-        a API do Clinicorp criará automaticamente um novo paciente.
+        IMPORTANTE: O paciente deve existir no Clinicorp antes de criar o agendamento.
+        Use buscar_ou_criar_paciente() primeiro para garantir que o paciente existe.
         
         Args:
-            paciente_id: ID do paciente (opcional se nome_paciente e telefone forem fornecidos)
+            paciente_id: ID do paciente no Clinicorp (OBRIGATÓRIO)
             profissional_id: ID do profissional/dentista
             data: Data do agendamento (datetime)
             hora_inicio: Hora de início (formato "HH:MM")
             hora_fim: Hora de fim (formato "HH:MM")
             observacoes: Observações do agendamento
             procedimentos: Lista de procedimentos
-            telefone: Telefone do paciente
-            email: Email do paciente
-            nome_paciente: Nome do paciente (usado para criar novo paciente se paciente_id não existir)
+            telefone: Telefone do paciente (para referência)
+            email: Email do paciente (para referência)
+            nome_paciente: Nome do paciente (para referência)
             
         Returns:
             Dicionário com resultado do agendamento
         """
         try:
+            # Valida que paciente_id foi fornecido
+            if not paciente_id or paciente_id == "" or paciente_id == "None":
+                return {
+                    'sucesso': False,
+                    'erro': 'paciente_id é obrigatório. Crie o paciente primeiro usando buscar_ou_criar_paciente().'
+                }
+            
             clinic_id = self._obter_clinic_id()
             endpoint = '/solution/api/appointment/create'
             
@@ -683,21 +797,9 @@ class AgendaAPI:
             # Calcula AtomicDate (YYYYMMDD)
             atomic_date = int(data.strftime('%Y%m%d'))
             
-            # Determina se é um novo paciente ou paciente existente
-            is_new_patient = not paciente_id or paciente_id == "" or paciente_id == "None"
-            
-            # Se não tem paciente_id mas tem telefone, tenta buscar paciente existente
-            if is_new_patient and telefone:
-                logger.info(f"Buscando paciente existente pelo telefone: {telefone}")
-                paciente_existente = self.buscar_paciente_por_telefone(telefone)
-                
-                if paciente_existente and paciente_existente.get('id'):
-                    paciente_id = str(paciente_existente['id'])
-                    is_new_patient = False
-                    logger.info(f"✅ Paciente encontrado no Clinicorp: {paciente_existente.get('nome')} (ID: {paciente_id})")
-            
-            # Prepara dados do agendamento
+            # Prepara dados do agendamento (sempre com paciente existente)
             agendamento_data = {
+                "Patient_PersonId": int(paciente_id),
                 "Dentist_PersonId": int(profissional_id),
                 "date": data_iso,
                 "referenceMonth": "",
@@ -740,27 +842,7 @@ class AgendaAPI:
                 "_AccessPath": "*.Calendar.Appointment.Create"
             }
             
-            if is_new_patient:
-                # Novo paciente - API do Clinicorp cria automaticamente
-                if not nome_paciente:
-                    return {
-                        'sucesso': False,
-                        'erro': 'Nome do paciente é obrigatório para criar novo paciente'
-                    }
-                if not telefone:
-                    return {
-                        'sucesso': False,
-                        'erro': 'Telefone é obrigatório para criar novo paciente'
-                    }
-                
-                agendamento_data["isNew"] = "X"
-                agendamento_data["Name"] = nome_paciente
-                logger.info(f"Criando agendamento com NOVO PACIENTE '{nome_paciente}' (telefone: {telefone}) com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
-            else:
-                # Paciente existente
-                agendamento_data["Patient_PersonId"] = int(paciente_id)
-                logger.info(f"Criando agendamento para paciente existente {paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
-            
+            logger.info(f"📅 Criando agendamento para paciente {paciente_id} com profissional {profissional_id} em {data.strftime('%Y-%m-%d')} {hora_inicio}-{hora_fim}")
             logger.debug(f"Payload do agendamento: {agendamento_data}")
             
             response = self.client.post(
@@ -775,25 +857,19 @@ class AgendaAPI:
             if response.status_code == 200:
                 try:
                     resultado = response.json()
-                    patient_id_criado = resultado.get('Patient_PersonId')
-                    patient_name = resultado.get('PatientName') or resultado.get('Name')
-                    
-                    if is_new_patient and patient_id_criado:
-                        logger.info(f"✅ Agendamento criado com sucesso! Novo paciente criado: {patient_name} (ID: {patient_id_criado})")
-                    else:
-                        logger.info("✅ Agendamento criado com sucesso")
+                    logger.info(f"✅ Agendamento criado com sucesso para paciente {paciente_id}")
                     
                     return {
                         'sucesso': True,
                         'dados': resultado,
-                        'paciente_criado': is_new_patient,
-                        'paciente_id': patient_id_criado
+                        'paciente_id': paciente_id
                     }
                 except:
                     logger.info("✅ Agendamento criado com sucesso (resposta não JSON)")
                     return {
                         'sucesso': True,
-                        'dados': response.text
+                        'dados': response.text,
+                        'paciente_id': paciente_id
                     }
             else:
                 logger.error(f"Erro ao criar agendamento: {response.status_code} - {response.text}")
