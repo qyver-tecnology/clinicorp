@@ -209,20 +209,23 @@ def criar_agendamento():
     """
     Cria um novo agendamento no Clinicorp
     
-    Se paciente_id não for fornecido, o sistema buscará o nome do paciente
-    pelo telefone e criará um novo paciente automaticamente no Clinicorp.
+    FLUXO:
+    1. Verifica se paciente existe pelo telefone
+    2. Se não existe, cria novo paciente
+    3. Se existe, usa dados existentes
+    4. Cria agendamento com ID do paciente
     
     Body JSON:
-        paciente_id: ID do paciente (opcional - se não fornecido, cria novo paciente)
+        paciente_id: ID do paciente (opcional - busca pelo telefone se não fornecido)
         profissional_id: ID do profissional (obrigatório)
         data: Data no formato YYYY-MM-DD (obrigatório)
         hora_inicio: Hora de início no formato HH:MM (obrigatório)
         hora_fim: Hora de fim no formato HH:MM (obrigatório)
         observacoes: Observações (opcional)
         procedimentos: Lista de procedimentos (opcional)
-        telefone: Telefone do paciente (obrigatório se paciente_id não for fornecido)
+        telefone: Telefone do paciente (obrigatório)
         email: Email do paciente (opcional)
-        nome_paciente: Nome do paciente (opcional - busca do banco se não fornecido)
+        nome_paciente: Nome do paciente (opcional - busca do histórico se não fornecido)
     """
     try:
         dados = request.get_json()
@@ -247,19 +250,26 @@ def criar_agendamento():
             return jsonify({'erro': 'Campo "hora_inicio" e obrigatorio (formato: HH:MM)'}), 400
         if not hora_fim:
             return jsonify({'erro': 'Campo "hora_fim" e obrigatorio (formato: HH:MM)'}), 400
+        if not telefone:
+            return jsonify({'erro': 'Campo "telefone" e obrigatorio'}), 400
         
-        # Se não tem paciente_id, precisa de telefone e nome para criar novo paciente
-        if not paciente_id:
-            logger.info(f"Paciente ID não fornecido, verificando telefone para criar novo paciente")
-            if not telefone:
-                return jsonify({
-                    'erro': 'Campo "telefone" e obrigatorio quando paciente_id nao e fornecido',
-                    'detalhes': 'Para criar um novo paciente, informe o telefone.'
-                }), 400
-            
-            # Se não tem nome_paciente no request, busca do banco pelo telefone
-            if not nome_paciente:
-                nome_paciente = _buscar_nome_paciente_por_telefone(telefone)
+        # FLUXO: Verificar se paciente existe
+        logger.info(f"🔍 Verificando se paciente existe para telefone: {telefone}")
+        
+        from app.services.chat_service import ChatService
+        chat_service = ChatService()
+        
+        # Verifica se paciente é conhecido (já conversou)
+        paciente_info = chat_service.verificar_paciente_conhecido(telefone)
+        
+        if paciente_info.get('conhecido'):
+            # Paciente já existe no histórico
+            logger.info(f"✅ Paciente já conhecido: {paciente_info.get('nome')} ({telefone})")
+            nome_paciente = paciente_info.get('nome', nome_paciente)
+            # paciente_id será criado no Clinicorp se necessário
+        else:
+            # Novo paciente - precisa do nome
+            logger.info(f"❌ Paciente desconhecido: {telefone}")
             
             if not nome_paciente:
                 return jsonify({
@@ -268,8 +278,7 @@ def criar_agendamento():
                     'telefone_informado': telefone
                 }), 400
             
-            logger.info(f"📝 Criando agendamento para novo paciente: '{nome_paciente}' (telefone: {telefone})")
-            # Log detalhado do nome do paciente para depuração
+            logger.info(f"📝 Novo paciente será criado: '{nome_paciente}' (telefone: {telefone})")
             logger.debug(f"Detalhes do paciente - Nome: '{nome_paciente}', Telefone: {telefone}, Caracteres no nome: {len(nome_paciente)}")
         
         # Converte data
@@ -594,5 +603,138 @@ def buscar_nome_paciente():
         
     except Exception as e:
         logger.error(f"Erro ao buscar nome do paciente: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@api_bp.route('/chat/verificar-paciente', methods=['GET'])
+def verificar_paciente_chat():
+    """
+    Verifica se o paciente já conversou antes pelo telefone
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+    """
+    try:
+        from app.services.chat_service import ChatService
+        
+        telefone = request.args.get('telefone', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Parâmetro "telefone" é obrigatório'}), 400
+        
+        chat_service = ChatService()
+        info_paciente = chat_service.verificar_paciente_conhecido(telefone)
+        
+        logger.info(f"🔍 Verificação de paciente: {telefone} - Conhecido: {info_paciente.get('conhecido')}")
+        
+        return jsonify(info_paciente), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar paciente: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@api_bp.route('/chat/historico', methods=['GET'])
+def obter_historico_chat():
+    """
+    Obtém o histórico de conversas de um paciente
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+        dias: Número de dias para buscar (padrão 30)
+    """
+    try:
+        from app.services.chat_service import ChatService
+        
+        telefone = request.args.get('telefone', '').strip()
+        dias = int(request.args.get('dias', '30'))
+        
+        if not telefone:
+            return jsonify({'erro': 'Parâmetro "telefone" é obrigatório'}), 400
+        
+        chat_service = ChatService()
+        historico = chat_service.buscar_historico_por_telefone(telefone, dias)
+        
+        logger.info(f"📋 Histórico obtido para {telefone}: {len(historico)} mensagens")
+        
+        return jsonify({
+            'telefone': telefone,
+            'dias': dias,
+            'total_mensagens': len(historico),
+            'historico': historico
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter histórico: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@api_bp.route('/chat/contexto', methods=['GET'])
+def obter_contexto_paciente():
+    """
+    Obtém o contexto completo do paciente para usar na IA
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+    """
+    try:
+        from app.services.chat_service import ChatService
+        
+        telefone = request.args.get('telefone', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Parâmetro "telefone" é obrigatório'}), 400
+        
+        chat_service = ChatService()
+        contexto = chat_service.obter_contexto_paciente(telefone)
+        
+        logger.info(f"📌 Contexto gerado para {telefone}")
+        
+        return jsonify({
+            'telefone': telefone,
+            'contexto': contexto
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter contexto: {e}")
+        return jsonify({'erro': str(e)}), 500
+
+
+@api_bp.route('/chat/nome-paciente', methods=['GET'])
+def obter_nome_paciente_por_telefone():
+    """
+    Obtém o nome do paciente pelo telefone do histórico de chat
+    
+    Query params:
+        telefone: Telefone do paciente (obrigatório)
+    """
+    try:
+        from app.services.chat_service import ChatService
+        
+        telefone = request.args.get('telefone', '').strip()
+        
+        if not telefone:
+            return jsonify({'erro': 'Parâmetro "telefone" é obrigatório'}), 400
+        
+        chat_service = ChatService()
+        nome = chat_service.obter_nome_paciente_por_telefone(telefone)
+        
+        if nome:
+            logger.info(f"📝 Nome do paciente obtido: {nome} ({telefone})")
+            return jsonify({
+                'encontrado': True,
+                'telefone': telefone,
+                'nome': nome
+            }), 200
+        else:
+            logger.info(f"❌ Nome não encontrado para: {telefone}")
+            return jsonify({
+                'encontrado': False,
+                'telefone': telefone,
+                'nome': None
+            }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter nome do paciente: {e}")
         return jsonify({'erro': str(e)}), 500
 
